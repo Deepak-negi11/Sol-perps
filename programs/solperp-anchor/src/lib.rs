@@ -15,7 +15,13 @@ declare_id!("7oYnX6upn2jhobcxUoarHs7MyyiF7ieZgzMGcjfQhrrD");
 pub mod solperp_anchor {
     use super::*;
 
-    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
-        initialize::handler(ctx)
+
+    pub fn initialize_market(
+        ctx: Context<InitializeMarket>,
+        max_leverage: u64,
+        liquidation_threshold_bps: u64,
+        trading_fees_bps: u64,
+    ) -> Result<()> {
+        initialize_market::initialize_market_handler(ctx, max_leverage, liquidation_threshold_bps, trading_fees_bps)
     }
 }

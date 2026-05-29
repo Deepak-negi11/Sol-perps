@@ -1,7 +1,11 @@
 use anchor_lang::prelude::*;
 
 #[error_code]
-pub enum ErrorCode {
-    #[msg("Custom error message")]
-    CustomError,
+pub enum SolPerpError {
+    #[msg("Invalid max leverage")]
+    InvalidMaxLeverage,
+    #[msg("Invalid liquidation threshold")]
+    InvalidLiquidationThreshold,
+    #[msg("Invalid trading fees")]
+    InvalidTradingFees,
 }
