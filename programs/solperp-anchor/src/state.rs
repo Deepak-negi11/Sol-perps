@@ -8,3 +8,14 @@ pub struct Market {
     pub trading_fees_bps: u64,
     pub bump: u8,
 }
+
+
+#[account]
+#[derive(InitSpace)]
+pub struct UserCollateral{
+    pub owner : Pubkey,
+    pub deposited_amount :u64,
+    pub locked_amount :u64,
+    pub bump : u8
+}
+

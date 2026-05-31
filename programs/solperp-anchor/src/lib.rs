@@ -24,4 +24,11 @@ pub mod solperp_anchor {
     ) -> Result<()> {
         initialize_market::initialize_market_handler(ctx, max_leverage, liquidation_threshold_bps, trading_fees_bps)
     }
+
+    pub fn deposit_collateral(
+        ctx: Context<DepositCollateral>,
+        amount:u64
+    ) -> Result<()>{
+        deposit_collateral::deposit_collateral_handler(ctx, amount)
+    }
 }

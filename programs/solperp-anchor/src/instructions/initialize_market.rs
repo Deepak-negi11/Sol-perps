@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 use crate::state::Market;
+use crate::constants::MARKET_SEED;
 
 #[derive(Accounts)]
 pub struct InitializeMarket<'info> {
