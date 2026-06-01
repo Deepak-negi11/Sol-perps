@@ -8,6 +8,12 @@ pub enum SolPerpError {
     InvalidLiquidationThreshold,
     #[msg("Invalid trading fees")]
     InvalidTradingFees,
-    #[msg(Deposit amount must be greater than zero)]
-    InvalidDepositAmount
+    #[msg("Deposit amount must be greater than zero")]
+    InvalidDepositAmount,
+    #[msg("Math overflow")]
+    MathOverflow,
+    #[msg("Withdraw amount must be greater than zero")]
+    InvalidWithdrawAmount,
+    #[msg("Insufficient available collateral")]
+    InsufficientAvailableCollateral,
 }

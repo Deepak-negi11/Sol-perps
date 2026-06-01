@@ -31,4 +31,11 @@ pub mod solperp_anchor {
     ) -> Result<()>{
         deposit_collateral::deposit_collateral_handler(ctx, amount)
     }
+
+    pub fn withdraw_collateral(
+        ctx:Context<WithdrawCollateral>,
+        amount:u64
+    )-> Result<()>{
+        withdraw_collateral::withdraw_collateral_handler(ctx, amount)
+    }
 }

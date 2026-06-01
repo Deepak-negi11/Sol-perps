@@ -1,7 +1,9 @@
 pub mod initialize_market;
-pub mof deposit_collateral;
+pub mod deposit_collateral;
+pub mod withdraw_collateral;
+
 
 pub use initialize_market::*;
 pub use deposit_collateral::*;
-
+pub use withdraw_collateral::*;
 
