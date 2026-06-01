@@ -20,3 +20,23 @@ pub struct UserCollateral{
     pub bump : u8
 }
 
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, InitSpace)]
+pub enum PositionSide {
+    Long,
+    Short,
+}
+
+#[account]
+#[derive(InitSpace)]
+pub struct Position {
+    pub owner: Pubkey,
+    pub market: Pubkey,
+    pub side: PositionSide,
+    pub collateral: u64,
+    pub leverage: u64,
+    pub position_size: u64,
+    pub entry_price: u64,
+    pub is_open: bool,
+    pub bump: u8,
+}
+

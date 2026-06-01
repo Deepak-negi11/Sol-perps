@@ -16,4 +16,16 @@ pub enum SolPerpError {
     InvalidWithdrawAmount,
     #[msg("Insufficient available collateral")]
     InsufficientAvailableCollateral,
+    #[msg("Invalid position collateral")]
+    InvalidPositionCollateral,
+    #[msg("Invalid leverage")]
+    InvalidLeverage,
+    #[msg("Position already open")]
+    PositionAlreadyOpen,
+    #[msg("Position is not open")]
+    PositionNotOpen,
+    #[msg("Loss exceeds collateral")]
+    LossExceedsCollateral,
+    #[msg("Invalid price")]
+    InvalidPrice,
 }

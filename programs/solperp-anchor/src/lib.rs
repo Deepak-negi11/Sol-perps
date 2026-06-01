@@ -38,4 +38,20 @@ pub mod solperp_anchor {
     )-> Result<()>{
         withdraw_collateral::withdraw_collateral_handler(ctx, amount)
     }
+
+    pub fn open_position(
+        ctx: Context<OpenPosition>,
+        side: PositionSide,
+        collateral: u64,
+        leverage: u64,
+        entry_price: u64,
+    ) -> Result<()> {
+        open_position::open_position_handler(ctx, side, collateral, leverage, entry_price)
+    }
+    pub fn close_position(
+    ctx: Context<ClosePosition>,
+    exit_price: u64,
+    ) -> Result<()> {
+        close_position_handler(ctx, exit_price)
+    }
 }

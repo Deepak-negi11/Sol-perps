@@ -40,8 +40,9 @@ pub struct WithdrawCollateral<'info>{
         associated_token::authority = user,
         associated_token::token_program = token_program
     )]
-    pub user_collateral_token_account: InterfaceAccount<'info , TokenAccount>
+    pub user_collateral_token_account: InterfaceAccount<'info , TokenAccount>,
 
+    /// CHECK: This is the vault authority PDA
     #[account(
         seeds = [VAULT_SEED],
         bump
@@ -56,7 +57,7 @@ pub struct WithdrawCollateral<'info>{
     )]
     pub vault_token_account: InterfaceAccount<'info , TokenAccount>,
 
-    pub token_program: Interface<'info , TokenAccount>,
+    pub token_program: Interface<'info , TokenInterface>,
     pub associated_token_program: Program<'info , AssociatedToken>,
     pub system_program:Program<'info , System>
 }
@@ -78,13 +79,13 @@ pub fn withdraw_collateral_handler(
     require!(
         available_amount >= amount,
         SolPerpError::InsufficientAvailableCollateral
-    )
+    );
 
     let decimals = ctx.accounts.collateral_mint.decimals;
 
     let vault_seeds: &[&[u8]] = &[
         VAULT_SEED,
-        &[ctx.bump.vault_authority],
+        &[ctx.bumps.vault_authority],
     ];
 
     let signer_seeds: &[&[&[u8]]] = &[vault_seeds];
@@ -97,7 +98,7 @@ pub fn withdraw_collateral_handler(
     };
 
     let cpi_ctx = CpiContext::new_with_signer(
-        ctx.accounts.token_program.to_account_info(),
+        ctx.accounts.token_program.key(),
         cpi_accounts,
         signer_seeds,
     );
@@ -109,7 +110,7 @@ pub fn withdraw_collateral_handler(
 
         .checked_sub(amount)
 
-        .ok_or(SolperpError::InsufficientAvailableCollateral)?;
+        .ok_or(SolPerpError::InsufficientAvailableCollateral)?;
 
     Ok(())
 }
