@@ -17,10 +17,13 @@ pub struct ClosePosition<'info> {
         mut,
         seeds = [
             USER_COLLATERAL_SEED,
+            market.key().as_ref(),
             user.key().as_ref()
         ],
         bump = user_collateral.bump,
-        constraint = user_collateral.owner == user.key()
+        constraint = user_collateral.owner == user.key(),
+        constraint = user_collateral.market == market.key(),
+        constraint = user_collateral.collateral_mint == market.collateral_mint
     )]
     pub user_collateral: Account<'info, UserCollateral>,
 
@@ -37,14 +40,23 @@ pub struct ClosePosition<'info> {
     )]
     pub position: Account<'info, Position>,
 
+    /// CHECK: Manual owner validation done in oracle module
+    pub price_update: UncheckedAccount<'info>,
+
+
+
     #[account(mut)]
     pub user: Signer<'info>,
 }
 
 pub fn close_position_handler(
     ctx: Context<ClosePosition>,
-    exit_price: u64,
 ) -> Result<()> {
+    // Read exit price from Pyth oracle
+   let exit_price = crate::oracle::get_price_from_pyth(
+        &ctx.accounts.price_update,
+        &ctx.accounts.market.price_feed_id,
+    )?;
     require!(exit_price > 0, SolPerpError::InvalidPrice);
 
     let user_collateral = &mut ctx.accounts.user_collateral;

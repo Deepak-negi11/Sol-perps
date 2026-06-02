@@ -13,14 +13,20 @@ pub struct OpenPosition<'info> {
     )]
     pub market: Account<'info, Market>,
 
+    /// CHECK: Manual owner validation done in oracle module
+    pub price_update: UncheckedAccount<'info>,
+
     #[account(
         mut,
         seeds = [
             USER_COLLATERAL_SEED,
+            market.key().as_ref(),
             user.key().as_ref()
         ],
         bump = user_collateral.bump,
-        constraint = user_collateral.owner == user.key()
+        constraint = user_collateral.owner == user.key(),
+        constraint = user_collateral.market == market.key(),
+        constraint = user_collateral.collateral_mint == market.collateral_mint
     )]
     pub user_collateral: Account<'info, UserCollateral>,
 
@@ -37,6 +43,8 @@ pub struct OpenPosition<'info> {
     )]
     pub position: Account<'info, Position>,
 
+
+
     #[account(mut)]
     pub user: Signer<'info>,
 
@@ -48,7 +56,6 @@ pub fn open_position_handler(
     side: PositionSide,
     collateral: u64,
     leverage: u64,
-    entry_price: u64,
 ) -> Result<()> {
     require!(collateral > 0, SolPerpError::InvalidPositionCollateral);
     require!(leverage > 0, SolPerpError::InvalidLeverage);
@@ -58,6 +65,11 @@ pub fn open_position_handler(
     );
     require!(!ctx.accounts.position.is_open, SolPerpError::PositionAlreadyOpen);
 
+    // Read entry price from Pyth oracle
+    let entry_price = crate::oracle::get_price_from_pyth(
+        &ctx.accounts.price_update,
+        &ctx.accounts.market.price_feed_id,
+    )?;
     let user_collateral = &mut ctx.accounts.user_collateral;
 
     let available_collateral = user_collateral

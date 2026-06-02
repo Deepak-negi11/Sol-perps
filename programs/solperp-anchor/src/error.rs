@@ -28,4 +28,10 @@ pub enum SolPerpError {
     LossExceedsCollateral,
     #[msg("Invalid price")]
     InvalidPrice,
+    #[msg("Position not liquidatable")]
+    PositionNotLiquidatable,
+    #[msg("Invalid oracle price")]
+    InvalidOraclePrice,
+    #[msg("Oracle confidence too wide")]
+    OracleConfidenceTooWide,
 }

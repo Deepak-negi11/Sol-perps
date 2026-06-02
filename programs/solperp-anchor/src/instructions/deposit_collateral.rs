@@ -8,16 +8,28 @@ use anchor_spl::{
 
 use crate::constants::{USER_COLLATERAL_SEED, VAULT_SEED};
 use crate::error::SolPerpError;
-use crate::state::UserCollateral;
+use crate::state::{UserCollateral, Market};
 
 
 #[derive(Accounts)]
 pub struct DepositCollateral<'info> {
     #[account(
+        mut,
+        seeds = [b"market"],
+        bump = market.bump,
+        constraint = market.collateral_mint == collateral_mint.key()
+    )]
+    pub market: Account<'info, Market>,
+
+    #[account(
         init_if_needed,
         payer = user,
         space = 8 + UserCollateral::INIT_SPACE,
-        seeds = [USER_COLLATERAL_SEED, user.key().as_ref()],
+        seeds = [
+            USER_COLLATERAL_SEED,
+            market.key().as_ref(),
+            user.key().as_ref()
+        ],
         bump
     )]
     pub user_collateral: Account<'info, UserCollateral>,
@@ -81,6 +93,8 @@ pub fn deposit_collateral_handler(
     
     if user_collateral.owner == Pubkey::default() {
         user_collateral.owner = ctx.accounts.user.key();
+        user_collateral.market = ctx.accounts.market.key();
+        user_collateral.collateral_mint = ctx.accounts.collateral_mint.key();
         user_collateral.bump = ctx.bumps.user_collateral;
     }
 

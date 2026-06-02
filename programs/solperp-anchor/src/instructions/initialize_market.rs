@@ -8,7 +8,8 @@ pub struct InitializeMarket<'info> {
     #[account(
         init,
         payer = admin,
-        space = 8 + 32 + 8 + 32 + 8 + 8 + 1, // discriminator (8) + admin (32) + max_leverage (8) + collateral_mint (32) + liquidation_threshold_bps (8) + trading_fees_bps (8) + bump (1)
+        // discriminator(8) + admin(32) + max_leverage(8) + oracle_price_feed(32) + collateral_mint(32) + liquidation_threshold_bps(8) + trading_fees_bps(8) + bump(1)
+        space = 8 + 32 + 8 + 32 + 32 + 8 + 8 + 1,
         seeds = [MARKET_SEED],
         bump
     )]
@@ -27,11 +28,13 @@ pub fn initialize_market_handler(
     max_leverage: u64,
     liquidation_threshold_bps: u64,
     trading_fees_bps: u64,
+    price_feed_id: [u8;32],
 ) -> Result<()> {
     let market = &mut ctx.accounts.market;
     market.admin = ctx.accounts.admin.key();
     market.max_leverage = max_leverage;
     market.collateral_mint = ctx.accounts.collateral_mint.key();
+    market.price_feed_id = price_feed_id;
     market.liquidation_threshold_bps = liquidation_threshold_bps;
     market.trading_fees_bps = trading_fees_bps;
     market.bump = ctx.bumps.market;

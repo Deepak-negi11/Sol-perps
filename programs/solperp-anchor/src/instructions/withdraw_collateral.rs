@@ -22,9 +22,15 @@ pub struct WithdrawCollateral<'info>{
 
     #[account(
         mut, 
-        seeds = [USER_COLLATERAL_SEED , user.key().as_ref()],
+        seeds = [
+            USER_COLLATERAL_SEED,
+            market.key().as_ref(),
+            user.key().as_ref()
+        ],
         bump = user_collateral.bump,
-        constraint = user_collateral.owner == user.key()
+        constraint = user_collateral.owner == user.key(),
+        constraint = user_collateral.market == market.key(),
+        constraint = user_collateral.collateral_mint == market.collateral_mint
     )]
     pub user_collateral: Account<'info , UserCollateral>,
 

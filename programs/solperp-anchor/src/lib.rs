@@ -1,6 +1,7 @@
 pub mod constants;
 pub mod error;
 pub mod instructions;
+pub mod oracle;
 pub mod state;
 
 use anchor_lang::prelude::*;
@@ -15,27 +16,33 @@ declare_id!("7oYnX6upn2jhobcxUoarHs7MyyiF7ieZgzMGcjfQhrrD");
 pub mod solperp_anchor {
     use super::*;
 
-
     pub fn initialize_market(
         ctx: Context<InitializeMarket>,
         max_leverage: u64,
         liquidation_threshold_bps: u64,
         trading_fees_bps: u64,
+        price_feed_id: [u8;32]
     ) -> Result<()> {
-        initialize_market::initialize_market_handler(ctx, max_leverage, liquidation_threshold_bps, trading_fees_bps)
+        initialize_market::initialize_market_handler(
+            ctx,
+            max_leverage,
+            liquidation_threshold_bps,
+            trading_fees_bps,
+            price_feed_id,
+        )
     }
 
     pub fn deposit_collateral(
         ctx: Context<DepositCollateral>,
-        amount:u64
-    ) -> Result<()>{
+        amount: u64,
+    ) -> Result<()> {
         deposit_collateral::deposit_collateral_handler(ctx, amount)
     }
 
     pub fn withdraw_collateral(
-        ctx:Context<WithdrawCollateral>,
-        amount:u64
-    )-> Result<()>{
+        ctx: Context<WithdrawCollateral>,
+        amount: u64,
+    ) -> Result<()> {
         withdraw_collateral::withdraw_collateral_handler(ctx, amount)
     }
 
@@ -44,14 +51,19 @@ pub mod solperp_anchor {
         side: PositionSide,
         collateral: u64,
         leverage: u64,
-        entry_price: u64,
     ) -> Result<()> {
-        open_position::open_position_handler(ctx, side, collateral, leverage, entry_price)
+        open_position::open_position_handler(ctx, side, collateral, leverage)
     }
+
     pub fn close_position(
-    ctx: Context<ClosePosition>,
-    exit_price: u64,
+        ctx: Context<ClosePosition>,
     ) -> Result<()> {
-        close_position_handler(ctx, exit_price)
+        close_position::close_position_handler(ctx)
+    }
+
+    pub fn liquidate_position(
+        ctx: Context<LiquidatePosition>,
+    ) -> Result<()> {
+        liquidation_position::liquidate_position_handler(ctx)
     }
 }

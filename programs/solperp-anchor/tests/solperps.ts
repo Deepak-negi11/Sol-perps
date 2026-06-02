@@ -22,6 +22,7 @@ describe("solperp-lab", () => {
     let vaultTokenAccount: anchor.web3.PublicKey;
     let userCollateralPda: anchor.web3.PublicKey;
     let vaultAuthorityPda: anchor.web3.PublicKey;
+    let marketPda: anchor.web3.PublicKey;
     const wallet = provider.wallet as any;
 
     before(async () => {
@@ -48,12 +49,21 @@ describe("solperp-lab", () => {
             collateralMint,
             userTokenAccount,
             wallet.payer,
-            1_000_000_000 // 1000 tokens
+            2_000_000_000 // Mint 2000 tokens (enough for multiple tests)
         );
 
-        // 4. Derive PDAs
+        // 3. Derive PDAs
+        [marketPda] = anchor.web3.PublicKey.findProgramAddressSync(
+            [Buffer.from("market")],
+            program.programId
+        );
+
         [userCollateralPda] = anchor.web3.PublicKey.findProgramAddressSync(
-            [Buffer.from("user_collateral"), wallet.publicKey.toBuffer()],
+            [
+                Buffer.from("user_collateral"),
+                marketPda.toBuffer(),
+                wallet.publicKey.toBuffer()
+            ],
             program.programId
         );
 
@@ -70,7 +80,7 @@ describe("solperp-lab", () => {
     });
 
     it("Initialize SOL-PERP market", async () => {
-        const [marketPda, marketBump] = anchor.web3.PublicKey.findProgramAddressSync(
+        const [, marketBump] = anchor.web3.PublicKey.findProgramAddressSync(
             [Buffer.from("market")],
             program.programId
         );
@@ -78,11 +88,13 @@ describe("solperp-lab", () => {
         const liquidationThresholdBps = new anchor.BN(500);
         const tradingFeesBps = new anchor.BN(10);
 
+        const priceFeedId = Array.from(Buffer.from("ef0d8b6fda2ceba41da15d4095d1da392a0d2f8ed0c6c7bc0f4cfac8c280b50d", "hex"));
         await program.methods
             .initializeMarket(
                 maxLeverage,
                 liquidationThresholdBps,
-                tradingFeesBps
+                tradingFeesBps,
+                priceFeedId
             )
             .accounts({
                 admin: provider.publicKey,
@@ -110,6 +122,8 @@ describe("solperp-lab", () => {
         await program.methods
             .depositCollateral(amount)
             .accounts({
+                market: marketPda,
+                userCollateral: userCollateralPda,
                 user: wallet.publicKey,
                 collateralMint: collateralMint,
                 tokenProgram: TOKEN_PROGRAM_ID,
@@ -132,11 +146,6 @@ describe("solperp-lab", () => {
     });
 
     it("Withdraw collateral", async () => {
-        const [marketPda] = anchor.web3.PublicKey.findProgramAddressSync(
-            [Buffer.from("market")],
-            program.programId
-        );
-
         const withdrawAmount = new anchor.BN(40_000_000); // 40 tokens
 
         await program.methods
@@ -162,17 +171,13 @@ describe("solperp-lab", () => {
         assert.equal(vaultBalance.value.amount, "60000000");
 
         const userBalance = await provider.connection.getTokenAccountBalance(userTokenAccount);
-        assert.equal(userBalance.value.amount, "940000000");
+        assert.equal(userBalance.value.amount, "1940000000"); // 2000 initial - 100 deposit + 40 withdraw = 1940
 
         console.log("Withdraw collateral success!");
         console.log("Remaining Deposited Amount in PDA:", userCollateralAccount.depositedAmount.toString());
     });
-    it("Open Position", async () => {
-        const [marketPda] = anchor.web3.PublicKey.findProgramAddressSync(
-            [Buffer.from("market")],
-            program.programId
-        );
 
+    it("Open Position", async () => {
         const [positionPda] = anchor.web3.PublicKey.findProgramAddressSync(
             [
                 Buffer.from("position"),
@@ -191,11 +196,11 @@ describe("solperp-lab", () => {
             .openPosition(
                 side,
                 collateral,
-                leverage,
-                entryPrice
+                leverage
             )
             .accounts({
                 market: marketPda,
+                priceUpdate: new anchor.web3.PublicKey("BGFoj6U2hdVMms3sggreHtQfW7GCF5TeqxNLiKT6iBxc"),
                 userCollateral: userCollateralPda,
                 position: positionPda,
                 user: wallet.publicKey,
@@ -224,13 +229,7 @@ describe("solperp-lab", () => {
         console.log("Locked Amount in user collateral PDA:", userCollateralAccount.lockedAmount.toString());
     });
 
-
     it("Close Position (Realizing a Loss)", async () => {
-        const [marketPda] = anchor.web3.PublicKey.findProgramAddressSync(
-            [Buffer.from("market")],
-            program.programId
-        );
-
         const [positionPda] = anchor.web3.PublicKey.findProgramAddressSync(
             [
                 Buffer.from("position"),
@@ -243,26 +242,95 @@ describe("solperp-lab", () => {
         const exitPrice = new anchor.BN(900); // 10% price drop results in 100% loss of 50 tokens collateral due to 10x leverage
 
         await program.methods
-            .closePosition(exitPrice)
+            .closePosition()
             .accounts({
                 market: marketPda,
+                userCollateral: userCollateralPda,
+                position: positionPda,
+                priceUpdate: new anchor.web3.PublicKey("C11dmJTHfjc3AizfTBpnU3DaPvFfywbEZpnN2dKPbU6r"),
+                user: wallet.publicKey,
+            })
+            .rpc();
+
+        const userCollateralAccount = await program.account.userCollateral.fetch(userCollateralPda);
+        assert.equal(userCollateralAccount.owner.toString(), wallet.publicKey.toString());
+        assert.equal(userCollateralAccount.depositedAmount.toString(), "10000000"); // 60M initial - 50M realized loss
+        assert.equal(userCollateralAccount.lockedAmount.toString(), "0"); // 50M initial - 50M collateral unlocked
+        console.log(userCollateralAccount.lockedAmount)
+
+        const positionAccount = await program.account.position.fetch(positionPda);
+        assert.equal(positionAccount.isOpen, false);
+
+        console.log("Close position success!");
+        console.log("Remaining Deposited Amount in PDA:", userCollateralAccount.depositedAmount.toString());
+        console.log("Locked Amount in PDA:", userCollateralAccount.lockedAmount.toString());
+    });
+
+    it("Liquidate Position", async () => {
+        const [positionPda] = anchor.web3.PublicKey.findProgramAddressSync(
+            [
+                Buffer.from("position"),
+                marketPda.toBuffer(),
+                wallet.publicKey.toBuffer()
+            ],
+            program.programId
+        );
+
+        // 1. Deposit 100M tokens more to enable opening a new position (current balance is 10M)
+        const depositAmount = new anchor.BN(100_000_000);
+        await program.methods
+            .depositCollateral(depositAmount)
+            .accounts({
+                market: marketPda,
+                userCollateral: userCollateralPda,
+                user: wallet.publicKey,
+                collateralMint: collateralMint,
+                tokenProgram: TOKEN_PROGRAM_ID,
+            })
+            .rpc();
+
+        // 2. Open a new long position (collateral: 50M, entry price: 1000, leverage: 10x)
+        const collateral = new anchor.BN(50_000_000);
+        const leverage = new anchor.BN(10);
+        const entryPrice = new anchor.BN(1000);
+        const side = { long: {} };
+
+        await program.methods
+            .openPosition(
+                side,
+                collateral,
+                leverage
+            )
+            .accounts({
+                market: marketPda,
+                priceUpdate: new anchor.web3.PublicKey("BGFoj6U2hdVMms3sggreHtQfW7GCF5TeqxNLiKT6iBxc"),
                 userCollateral: userCollateralPda,
                 position: positionPda,
                 user: wallet.publicKey,
             })
             .rpc();
 
-        // 1. Verify user collateral state after close
-        const userCollateralAccount = await program.account.userCollateral.fetch(userCollateralPda);
-        assert.equal(userCollateralAccount.owner.toString(), wallet.publicKey.toString());
-        assert.equal(userCollateralAccount.depositedAmount.toString(), "10000000"); // 60M initial - 50M realized loss
-        assert.equal(userCollateralAccount.lockedAmount.toString(), "0"); // 50M initial - 50M collateral unlocked
 
-        // 2. Verify position state
+        await program.methods
+            .liquidatePosition()
+            .accounts({
+                market: marketPda,
+                userCollateral: userCollateralPda,
+                position: positionPda,
+                priceUpdate: new anchor.web3.PublicKey("22uBBYZwcKenxnRcn9tcH1hLWNsTfLJTJFvMJUvKqehY"),
+                liquidator: wallet.publicKey,
+            })
+            .rpc();
+
+
+        const userCollateralAccount = await program.account.userCollateral.fetch(userCollateralPda);
+        assert.equal(userCollateralAccount.depositedAmount.toString(), "80000000");
+        assert.equal(userCollateralAccount.lockedAmount.toString(), "0");
+
         const positionAccount = await program.account.position.fetch(positionPda);
         assert.equal(positionAccount.isOpen, false);
 
-        console.log("Close position success!");
+        console.log("Liquidation position success!");
         console.log("Remaining Deposited Amount in PDA:", userCollateralAccount.depositedAmount.toString());
         console.log("Locked Amount in PDA:", userCollateralAccount.lockedAmount.toString());
     });

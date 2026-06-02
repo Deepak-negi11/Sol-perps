@@ -1,5 +1,5 @@
 [toolchain]
-package_manager = "yarn"
+package_manager = "bun"
 
 [features]
 resolution = true
@@ -13,6 +13,22 @@ cluster = "localnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
-test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 programs/solperp-anchor/tests/**/*.ts"
+test = "bun x ts-mocha -p ./tsconfig.json -t 1000000 programs/solperp-anchor/tests/**/*.ts"
 
 [hooks]
+
+[test.validator]
+url = "https://api.devnet.solana.com"
+
+[[test.validator.account]]
+address = "BGFoj6U2hdVMms3sggreHtQfW7GCF5TeqxNLiKT6iBxc"
+filename = "programs/solperp-anchor/tests/fixtures/price_update_open.json"
+
+[[test.validator.account]]
+address = "C11dmJTHfjc3AizfTBpnU3DaPvFfywbEZpnN2dKPbU6r"
+filename = "programs/solperp-anchor/tests/fixtures/price_update_close.json"
+
+[[test.validator.account]]
+address = "22uBBYZwcKenxnRcn9tcH1hLWNsTfLJTJFvMJUvKqehY"
+filename = "programs/solperp-anchor/tests/fixtures/price_update_liq.json"
+
