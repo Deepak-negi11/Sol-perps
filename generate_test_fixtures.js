@@ -5,7 +5,6 @@ function serializePriceUpdate(feedIdHex, price, exponent, publishTime) {
     const buffer = Buffer.alloc(8 + 32 + 1 + 32 + 8 + 8 + 4 + 8 + 8 + 8 + 8 + 8);
     let offset = 0;
 
-    // 1. Discriminator (8 bytes): [2, 55, 172, 194, 219, 150, 241, 169]
     const discriminator = Buffer.from([2, 55, 172, 194, 219, 150, 241, 169]);
     discriminator.copy(buffer, offset);
     offset += 8;

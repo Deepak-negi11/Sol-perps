@@ -9,6 +9,7 @@ use anchor_spl::{
 use crate::constants::{USER_COLLATERAL_SEED, VAULT_SEED};
 use crate::error::SolPerpError;
 use crate::state::{UserCollateral, Market};
+use crate::event::CollateralDeposited;
 
 
 #[derive(Accounts)]
@@ -102,6 +103,14 @@ pub fn deposit_collateral_handler(
         .deposited_amount
         .checked_add(amount)
         .ok_or(SolPerpError::MathOverflow)?;
+    
+    emit!(CollateralDeposited {
+        user: ctx.accounts.user.key(),
+        market: ctx.accounts.market.key(),
+        collateral_mint: ctx.accounts.collateral_mint.key(),
+        amount,
+        new_deposited_amount: user_collateral.deposited_amount,
+    });
 
     Ok(())
 }

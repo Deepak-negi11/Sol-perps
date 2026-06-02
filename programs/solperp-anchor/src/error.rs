@@ -34,4 +34,8 @@ pub enum SolPerpError {
     InvalidOraclePrice,
     #[msg("Oracle confidence too wide")]
     OracleConfidenceTooWide,
+    #[msg("Market is paused")]
+    MarketPaused,
+    #[msg("Only market admin can perform this action")]
+    UnauthorizedAdmin,
 }

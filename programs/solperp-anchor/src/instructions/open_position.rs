@@ -3,6 +3,7 @@ use anchor_lang::prelude::*;
 use crate::constants::{MARKET_SEED, POSITION_SEED, USER_COLLATERAL_SEED};
 use crate::error::SolPerpError;
 use crate::state::{Market, Position, PositionSide, UserCollateral};
+use crate::event::PositionOpened;
 
 #[derive(Accounts)]
 pub struct OpenPosition<'info> {
@@ -57,6 +58,7 @@ pub fn open_position_handler(
     collateral: u64,
     leverage: u64,
 ) -> Result<()> {
+    require!(!ctx.accounts.market.is_paused, SolPerpError::MarketPaused);
     require!(collateral > 0, SolPerpError::InvalidPositionCollateral);
     require!(leverage > 0, SolPerpError::InvalidLeverage);
     require!(
@@ -64,7 +66,6 @@ pub fn open_position_handler(
         SolPerpError::InvalidLeverage
     );
     require!(!ctx.accounts.position.is_open, SolPerpError::PositionAlreadyOpen);
-
     // Read entry price from Pyth oracle
     let entry_price = crate::oracle::get_price_from_pyth(
         &ctx.accounts.price_update,
@@ -102,6 +103,16 @@ pub fn open_position_handler(
     position.entry_price = entry_price;
     position.is_open = true;
     position.bump = ctx.bumps.position;
+
+    emit!(PositionOpened {
+        user: ctx.accounts.user.key(),
+        market: ctx.accounts.market.key(),
+        side: position.side.clone(),
+        collateral: position.collateral,
+        leverage: position.leverage,
+        position_size: position.position_size,
+        entry_price: position.entry_price,
+    });
 
     Ok(())
 }

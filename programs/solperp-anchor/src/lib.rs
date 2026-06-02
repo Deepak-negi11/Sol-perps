@@ -3,6 +3,9 @@ pub mod error;
 pub mod instructions;
 pub mod oracle;
 pub mod state;
+pub mod math;
+pub mod event;
+
 
 use anchor_lang::prelude::*;
 
@@ -66,4 +69,31 @@ pub mod solperp_anchor {
     ) -> Result<()> {
         liquidation_position::liquidate_position_handler(ctx)
     }
+
+    pub fn pause_market(
+        ctx: Context<PauseMarket>,
+    ) -> Result<()> {
+        pause_market::pause_market_handler(ctx)
+    }
+
+    pub fn resume_market(
+        ctx: Context<ResumeMarket>,
+    ) -> Result<()> {
+        resume_market::resume_market_handler(ctx)
+    }
+
+    pub fn update_market_config(
+        ctx: Context<UpdateMarketConfig>,
+        max_leverage: u64,
+        liquidation_threshold_bps: u64,
+        trading_fees_bps: u64,
+    ) -> Result<()> {
+        update_market_config_handler(
+            ctx,
+            max_leverage,
+            liquidation_threshold_bps,
+            trading_fees_bps,
+        )
+    }
+
 }

@@ -2,7 +2,9 @@ use anchor_lang::prelude::*;
 
 use crate::constants::{MARKET_SEED, POSITION_SEED, USER_COLLATERAL_SEED};
 use crate::error::SolPerpError;
-use crate::state::{Market, Position, PositionSide, UserCollateral};
+use crate::state::{Market, Position, UserCollateral};
+use crate::math::{calculate_pnl, calculate_realized_loss};
+use crate::event::PositionClosed;
 
 #[derive(Accounts)]
 pub struct ClosePosition<'info> {
@@ -83,11 +85,7 @@ pub fn close_position_handler(
             .checked_abs()
             .ok_or(SolPerpError::MathOverflow)? as u64;
 
-        let realized_loss = if loss > position.collateral {
-            position.collateral
-        } else {
-            loss
-        };
+        let realized_loss = calculate_realized_loss(loss, position.collateral);
 
         user_collateral.deposited_amount = user_collateral
             .deposited_amount
@@ -99,31 +97,21 @@ pub fn close_position_handler(
         .locked_amount
         .checked_sub(position.collateral)
         .ok_or(SolPerpError::MathOverflow)?;
+    let user = position.owner;
+    let market = position.market;
+    let side = position.side.clone();
+
+    emit!(PositionClosed {
+        user,
+        market,
+        side,
+        exit_price,
+        pnl,
+        deposited_amount_after: user_collateral.deposited_amount,
+    });
 
     position.is_open = false;
 
     Ok(())
 }
 
-fn calculate_pnl(
-    side: &PositionSide,
-    position_size: u64,
-    entry_price: u64,
-    exit_price: u64,
-) -> Result<i64> {
-    require!(entry_price > 0, SolPerpError::InvalidPrice);
-    require!(exit_price > 0, SolPerpError::InvalidPrice);
-
-    let price_diff: i128 = match side {
-        PositionSide::Long => exit_price as i128 - entry_price as i128,
-        PositionSide::Short => entry_price as i128 - exit_price as i128,
-    };
-
-    let pnl = (position_size as i128)
-        .checked_mul(price_diff)
-        .ok_or(SolPerpError::MathOverflow)?
-        .checked_div(entry_price as i128)
-        .ok_or(SolPerpError::MathOverflow)?;
-
-    Ok(pnl as i64)
-}

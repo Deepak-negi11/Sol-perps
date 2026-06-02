@@ -334,4 +334,126 @@ describe("solperp-lab", () => {
         console.log("Remaining Deposited Amount in PDA:", userCollateralAccount.depositedAmount.toString());
         console.log("Locked Amount in PDA:", userCollateralAccount.lockedAmount.toString());
     });
+
+    it("Admin can pause market", async () => {
+        await program.methods
+            .pauseMarket()
+            .accounts({
+                market: marketPda,
+                admin: wallet.publicKey,
+            })
+            .rpc();
+
+        const marketAccount = await program.account.market.fetch(marketPda);
+        assert.equal(marketAccount.isPaused, true);
+        console.log("Market paused successfully!");
+    });
+
+    it("open_position fails when paused", async () => {
+        const [positionPda] = anchor.web3.PublicKey.findProgramAddressSync(
+            [
+                Buffer.from("position"),
+                marketPda.toBuffer(),
+                wallet.publicKey.toBuffer()
+            ],
+            program.programId
+        );
+
+        const collateral = new anchor.BN(10_000_000);
+        const leverage = new anchor.BN(5);
+        const side = { long: {} };
+
+        try {
+            await program.methods
+                .openPosition(
+                    side,
+                    collateral,
+                    leverage
+                )
+                .accounts({
+                    market: marketPda,
+                    priceUpdate: new anchor.web3.PublicKey("BGFoj6U2hdVMms3sggreHtQfW7GCF5TeqxNLiKT6iBxc"),
+                    userCollateral: userCollateralPda,
+                    position: positionPda,
+                    user: wallet.publicKey,
+                })
+                .rpc();
+            assert.fail("Should have failed to open position when market is paused");
+        } catch (err: any) {
+            assert.include(err.toString(), "Market is paused");
+            console.log("Successfully failed to open position on paused market!");
+        }
+    });
+
+    it("Admin can resume market", async () => {
+        await program.methods
+            .resumeMarket()
+            .accounts({
+                market: marketPda,
+                admin: wallet.publicKey,
+            })
+            .rpc();
+
+        const marketAccount = await program.account.market.fetch(marketPda);
+        assert.equal(marketAccount.isPaused, false);
+        console.log("Market resumed successfully!");
+    });
+
+    it("Admin can update max leverage", async () => {
+        const newMaxLeverage = new anchor.BN(8);
+        const liquidationThresholdBps = new anchor.BN(500);
+        const tradingFeesBps = new anchor.BN(10);
+
+        await program.methods
+            .updateMarketConfig(
+                newMaxLeverage,
+                liquidationThresholdBps,
+                tradingFeesBps
+            )
+            .accounts({
+                market: marketPda,
+                admin: wallet.publicKey,
+            })
+            .rpc();
+
+        const marketAccount = await program.account.market.fetch(marketPda);
+        assert.equal(marketAccount.maxLeverage.toString(), "8");
+        console.log("Max leverage updated to 8!");
+    });
+
+    it("open_position with leverage above max fails", async () => {
+        const [positionPda] = anchor.web3.PublicKey.findProgramAddressSync(
+            [
+                Buffer.from("position"),
+                marketPda.toBuffer(),
+                wallet.publicKey.toBuffer()
+            ],
+            program.programId
+        );
+
+        const collateral = new anchor.BN(10_000_000);
+        const leverage = new anchor.BN(10); // 10x is above current max of 8x
+        const side = { long: {} };
+
+        try {
+            await program.methods
+                .openPosition(
+                    side,
+                    collateral,
+                    leverage
+                )
+                .accounts({
+                    market: marketPda,
+                    priceUpdate: new anchor.web3.PublicKey("BGFoj6U2hdVMms3sggreHtQfW7GCF5TeqxNLiKT6iBxc"),
+                    userCollateral: userCollateralPda,
+                    position: positionPda,
+                    user: wallet.publicKey,
+                })
+                .rpc();
+            assert.fail("Should have failed to open position with leverage above max");
+        } catch (err: any) {
+            assert.include(err.toString(), "Invalid leverage");
+            console.log("Successfully failed to open position with leverage above max!");
+        }
+    });
 });

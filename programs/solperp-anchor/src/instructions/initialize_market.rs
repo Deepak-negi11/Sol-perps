@@ -2,14 +2,14 @@ use anchor_lang::prelude::*;
 use crate::state::Market;
 use crate::constants::MARKET_SEED;
 use anchor_spl::token_interface::Mint;
+use crate::event::MarketInitialized;
 
 #[derive(Accounts)]
 pub struct InitializeMarket<'info> {
     #[account(
         init,
         payer = admin,
-        // discriminator(8) + admin(32) + max_leverage(8) + oracle_price_feed(32) + collateral_mint(32) + liquidation_threshold_bps(8) + trading_fees_bps(8) + bump(1)
-        space = 8 + 32 + 8 + 32 + 32 + 8 + 8 + 1,
+        space = 8 + Market::INIT_SPACE,
         seeds = [MARKET_SEED],
         bump
     )]
@@ -30,6 +30,7 @@ pub fn initialize_market_handler(
     trading_fees_bps: u64,
     price_feed_id: [u8;32],
 ) -> Result<()> {
+
     let market = &mut ctx.accounts.market;
     market.admin = ctx.accounts.admin.key();
     market.max_leverage = max_leverage;
@@ -38,5 +39,16 @@ pub fn initialize_market_handler(
     market.liquidation_threshold_bps = liquidation_threshold_bps;
     market.trading_fees_bps = trading_fees_bps;
     market.bump = ctx.bumps.market;
+    market.is_paused = false;
+
+    emit!(MarketInitialized {
+        admin: market.admin,
+        market: market.key(),
+        collateral_mint: market.collateral_mint,
+        max_leverage: market.max_leverage,
+        liquidation_threshold_bps: market.liquidation_threshold_bps,
+        trading_fees_bps: market.trading_fees_bps,
+    });
+
     Ok(())
 }
