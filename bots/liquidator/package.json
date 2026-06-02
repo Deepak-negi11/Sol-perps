@@ -1,0 +1,9 @@
+{
+  "dependencies": {
+    "@coral-xyz/anchor": "^0.32.1",
+    "dotenv": "^17.4.2"
+  },
+  "scripts": {
+    "liquidator": "bun liquidator.ts"
+  }
+}

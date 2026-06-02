@@ -1,8 +1,20 @@
-.anchor
+# Dependencies
+node_modules/
+**/node_modules/
+target/
+**/target/
+.anchor/
+test-ledger/
+
+# Env & Secrets
+.env
+.env.*
+
+# OS files
 .DS_Store
-target
+Thumbs.db
+
+# Other
 **/*.rs.bk
-node_modules
-test-ledger
-.yarn
-.surfpool
+.yarn/
+.surfpool/
