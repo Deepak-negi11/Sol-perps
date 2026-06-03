@@ -38,7 +38,8 @@ impl anchor_lang::Owner for PriceUpdateV2 {
     fn owner() -> Pubkey {
         // rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ (Pyth Receiver Program)
         let bytes: [u8; 32] = [
-            242, 237, 85, 238, 18, 93, 219, 137, 198, 145, 150, 48, 12, 19, 214, 115, 6, 219, 149, 112, 129, 234, 172, 123, 144, 252, 169, 10, 48, 203, 31, 237
+            242, 237, 85, 238, 18, 93, 219, 137, 198, 145, 150, 48, 12, 19, 214, 115, 6, 219, 149,
+            112, 129, 234, 172, 123, 144, 252, 169, 10, 48, 203, 31, 237,
         ];
         Pubkey::new_from_array(bytes)
     }
@@ -96,30 +97,34 @@ impl anchor_lang::AccountDeserialize for PriceUpdateV2 {
 
 impl anchor_lang::AccountSerialize for PriceUpdateV2 {
     fn try_serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        writer.write_all(Self::DISCRIMINATOR)
+        writer
+            .write_all(Self::DISCRIMINATOR)
             .map_err(|_| anchor_lang::error::ErrorCode::AccountDidNotSerialize)?;
-        self.write_authority.serialize(writer)
+        self.write_authority
+            .serialize(writer)
             .map_err(|_| anchor_lang::error::ErrorCode::AccountDidNotSerialize)?;
-        self.verification_level.serialize(writer)
+        self.verification_level
+            .serialize(writer)
             .map_err(|_| anchor_lang::error::ErrorCode::AccountDidNotSerialize)?;
-        self.price_message.serialize(writer)
+        self.price_message
+            .serialize(writer)
             .map_err(|_| anchor_lang::error::ErrorCode::AccountDidNotSerialize)?;
-        self.posted_slot.serialize(writer)
+        self.posted_slot
+            .serialize(writer)
             .map_err(|_| anchor_lang::error::ErrorCode::AccountDidNotSerialize)?;
         Ok(())
     }
 }
 
-pub fn get_price_from_pyth(
-    price_update_info: &AccountInfo,
-    feed_id: &[u8; 32],
-) -> Result<u64> {
+pub fn get_price_from_pyth(price_update_info: &AccountInfo, feed_id: &[u8; 32]) -> Result<u64> {
     let owner = price_update_info.owner;
     let devnet_pyth = Pubkey::new_from_array([
-        242, 237, 85, 238, 18, 93, 219, 137, 198, 145, 150, 48, 12, 19, 214, 115, 6, 219, 149, 112, 129, 234, 172, 123, 144, 252, 169, 10, 48, 203, 31, 237
+        242, 237, 85, 238, 18, 93, 219, 137, 198, 145, 150, 48, 12, 19, 214, 115, 6, 219, 149, 112,
+        129, 234, 172, 123, 144, 252, 169, 10, 48, 203, 31, 237,
     ]); // HMHZhN31Q7ERSR2ekrPKbjqYc7icK7eqkoDZ6sEdHzv8
     let mainnet_pyth = Pubkey::new_from_array([
-        12, 183, 250, 187, 82, 247, 166, 72, 187, 91, 49, 125, 154, 1, 139, 144, 87, 203, 2, 71, 116, 250, 254, 1, 230, 196, 223, 152, 204, 56, 88, 129
+        12, 183, 250, 187, 82, 247, 166, 72, 187, 91, 49, 125, 154, 1, 139, 144, 87, 203, 2, 71,
+        116, 250, 254, 1, 230, 196, 223, 152, 204, 56, 88, 129,
     ]); // rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ
 
     require!(
@@ -145,14 +150,19 @@ pub fn get_price_from_pyth(
         publish_time > 0 && current_time >= publish_time,
         crate::error::SolPerpError::InvalidOraclePrice
     );
-    let age = current_time.checked_sub(publish_time).ok_or(crate::error::SolPerpError::MathOverflow)?;
+    let age = current_time
+        .checked_sub(publish_time)
+        .ok_or(crate::error::SolPerpError::MathOverflow)?;
     require!(
         age as u64 <= MAXIMUM_PRICE_AGE_SECONDS,
         crate::error::SolPerpError::InvalidOraclePrice
     );
 
     let price = &price_update.price_message;
-    require!(price.price > 0, crate::error::SolPerpError::InvalidOraclePrice);
+    require!(
+        price.price > 0,
+        crate::error::SolPerpError::InvalidOraclePrice
+    );
 
     // Confidence check
     let abs_price = price.price.abs();

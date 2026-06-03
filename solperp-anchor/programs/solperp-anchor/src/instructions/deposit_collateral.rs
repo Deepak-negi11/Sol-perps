@@ -1,16 +1,13 @@
 use anchor_lang::prelude::*;
 use anchor_spl::{
     associated_token::AssociatedToken,
-    token_interface::{
-        self, Mint, TokenAccount, TokenInterface, TransferChecked,
-    },
+    token_interface::{self, Mint, TokenAccount, TokenInterface, TransferChecked},
 };
 
 use crate::constants::{USER_COLLATERAL_SEED, VAULT_SEED};
 use crate::error::SolPerpError;
-use crate::state::{UserCollateral, Market};
 use crate::event::CollateralDeposited;
-
+use crate::state::{Market, UserCollateral};
 
 #[derive(Accounts)]
 pub struct DepositCollateral<'info> {
@@ -66,32 +63,26 @@ pub struct DepositCollateral<'info> {
 
     pub token_program: Interface<'info, TokenInterface>,
     pub associated_token_program: Program<'info, AssociatedToken>,
-    
+
     pub system_program: Program<'info, System>,
 }
 
-pub fn deposit_collateral_handler(
-    ctx: Context<DepositCollateral>,
-    amount: u64,
-) -> Result<()> {
+pub fn deposit_collateral_handler(ctx: Context<DepositCollateral>, amount: u64) -> Result<()> {
     require!(amount > 0, SolPerpError::InvalidDepositAmount);
     let decimals = ctx.accounts.collateral_mint.decimals;
-     
+
     let cpi_accounts = TransferChecked {
         from: ctx.accounts.user_collateral_token.to_account_info(),
         to: ctx.accounts.vault_collateral_token.to_account_info(),
         mint: ctx.accounts.collateral_mint.to_account_info(),
         authority: ctx.accounts.user.to_account_info(),
     };
-    
-    let cpi_ctx = CpiContext::new(
-        ctx.accounts.token_program.key(),
-        cpi_accounts,
-    );
+
+    let cpi_ctx = CpiContext::new(ctx.accounts.token_program.key(), cpi_accounts);
     token_interface::transfer_checked(cpi_ctx, amount, decimals)?;
-    
+
     let user_collateral = &mut ctx.accounts.user_collateral;
-    
+
     if user_collateral.owner == Pubkey::default() {
         user_collateral.owner = ctx.accounts.user.key();
         user_collateral.market = ctx.accounts.market.key();
@@ -103,7 +94,7 @@ pub fn deposit_collateral_handler(
         .deposited_amount
         .checked_add(amount)
         .ok_or(SolPerpError::MathOverflow)?;
-    
+
     emit!(CollateralDeposited {
         user: ctx.accounts.user.key(),
         market: ctx.accounts.market.key(),

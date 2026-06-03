@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::state::PositionSide;
+use crate::state::{OrderType, PositionSide, TriggerCondition};
 
 #[event]
 pub struct MarketInitialized {
@@ -28,6 +28,24 @@ pub struct CollateralWithdrawn {
     pub collateral_mint: Pubkey,
     pub amount: u64,
     pub new_deposited_amount: u64,
+}
+
+#[event]
+pub struct LiquidityAdded {
+    pub admin: Pubkey,
+    pub market: Pubkey,
+    pub collateral_mint: Pubkey,
+    pub amount: u64,
+    pub new_pool_balance: u64,
+}
+
+#[event]
+pub struct LiquidityRemoved {
+    pub admin: Pubkey,
+    pub market: Pubkey,
+    pub collateral_mint: Pubkey,
+    pub amount: u64,
+    pub new_pool_balance: u64,
 }
 
 #[event]
@@ -60,4 +78,35 @@ pub struct PositionLiquidated {
     pub current_price: u64,
     pub remaining_collateral: u64,
     pub realized_loss: u64,
+}
+
+#[event]
+pub struct TriggerOrderPlaced {
+    pub user: Pubkey,
+    pub market: Pubkey,
+    pub order_id: u64,
+    pub order_type: OrderType,
+    pub side: PositionSide,
+    pub trigger_condition: TriggerCondition,
+    pub collateral: u64,
+    pub leverage: u64,
+    pub trigger_price: u64,
+}
+
+#[event]
+pub struct TriggerOrderCanceled {
+    pub user: Pubkey,
+    pub market: Pubkey,
+    pub order_id: u64,
+    pub order_type: OrderType,
+}
+
+#[event]
+pub struct TriggerOrderExecuted {
+    pub user: Pubkey,
+    pub market: Pubkey,
+    pub order_id: u64,
+    pub order_type: OrderType,
+    pub executor: Pubkey,
+    pub execution_price: u64,
 }

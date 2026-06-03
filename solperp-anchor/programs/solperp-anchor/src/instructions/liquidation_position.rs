@@ -1,9 +1,9 @@
-use anchor_lang::prelude::*;
-use crate::event::PositionLiquidated;
 use crate::constants::{MARKET_SEED, POSITION_SEED, USER_COLLATERAL_SEED};
 use crate::error::SolPerpError;
-use crate::state::{Market, Position, UserCollateral};
-use crate::math::{calculate_pnl,calculate_remaining_collateral,calculate_required_margin};
+use crate::event::PositionLiquidated;
+use crate::math::{calculate_pnl, calculate_remaining_collateral, calculate_required_margin};
+use crate::state::{Market, Position, PositionSide, UserCollateral};
+use anchor_lang::prelude::*;
 #[derive(Accounts)]
 pub struct LiquidatePosition<'info> {
     #[account(
@@ -42,24 +42,20 @@ pub struct LiquidatePosition<'info> {
     /// CHECK: Manual owner validation done in oracle module
     pub price_update: UncheckedAccount<'info>,
 
-
-
     #[account(mut)]
     pub liquidator: Signer<'info>,
 }
 
-pub fn liquidate_position_handler(
-    ctx: Context<LiquidatePosition>,
-) -> Result<()> {
+pub fn liquidate_position_handler(ctx: Context<LiquidatePosition>) -> Result<()> {
     // Read current price from Pyth oracle
     let current_price = crate::oracle::get_price_from_pyth(
-            &ctx.accounts.price_update,
-            &ctx.accounts.market.price_feed_id,
-    )?;    
-    
+        &ctx.accounts.price_update,
+        &ctx.accounts.market.price_feed_id,
+    )?;
+
     require!(current_price > 0, SolPerpError::InvalidPrice);
 
-    let market = &ctx.accounts.market;
+    let market = &mut ctx.accounts.market;
     let user_collateral = &mut ctx.accounts.user_collateral;
     let position = &mut ctx.accounts.position;
 
@@ -74,10 +70,8 @@ pub fn liquidate_position_handler(
 
     let remaining_collateral = calculate_remaining_collateral(position.collateral, pnl)?;
 
-    let required_margin = calculate_required_margin(
-        position.position_size,
-        market.liquidation_threshold_bps
-    )?;
+    let required_margin =
+        calculate_required_margin(position.position_size, market.liquidation_threshold_bps)?;
 
     require!(
         remaining_collateral <= required_margin,
@@ -98,7 +92,27 @@ pub fn liquidate_position_handler(
         .locked_amount
         .checked_sub(position.collateral)
         .ok_or(SolPerpError::MathOverflow)?;
-    
+
+    market.pool_balance = market
+        .pool_balance
+        .checked_add(realized_loss)
+        .ok_or(SolPerpError::MathOverflow)?;
+
+    match position.side {
+        PositionSide::Long => {
+            market.open_interest_long = market
+                .open_interest_long
+                .checked_sub(position.position_size)
+                .ok_or(SolPerpError::MathOverflow)?;
+        }
+        PositionSide::Short => {
+            market.open_interest_short = market
+                .open_interest_short
+                .checked_sub(position.position_size)
+                .ok_or(SolPerpError::MathOverflow)?;
+        }
+    }
+
     emit!(PositionLiquidated {
         user: position.owner,
         liquidator: ctx.accounts.liquidator.key(),
@@ -113,4 +127,3 @@ pub fn liquidate_position_handler(
 
     Ok(())
 }
-

@@ -31,10 +31,7 @@ pub fn calculate_pnl(
     Ok(pnl as i64)
 }
 
-pub fn calculate_remaining_collateral(
-    position_collateral: u64,
-    pnl: i64,
-) -> Result<u64> {
+pub fn calculate_remaining_collateral(position_collateral: u64, pnl: i64) -> Result<u64> {
     if pnl >= 0 {
         let profit = pnl as u64;
 
@@ -42,9 +39,7 @@ pub fn calculate_remaining_collateral(
             .checked_add(profit)
             .ok_or(SolPerpError::MathOverflow.into())
     } else {
-        let loss = pnl
-            .checked_abs()
-            .ok_or(SolPerpError::MathOverflow)? as u64;
+        let loss = pnl.checked_abs().ok_or(SolPerpError::MathOverflow)? as u64;
 
         if loss >= position_collateral {
             Ok(0)
@@ -56,10 +51,7 @@ pub fn calculate_remaining_collateral(
     }
 }
 
-pub fn calculate_realized_loss(
-    loss: u64,
-    position_collateral: u64,
-) -> u64 {
+pub fn calculate_realized_loss(loss: u64, position_collateral: u64) -> u64 {
     if loss > position_collateral {
         position_collateral
     } else {
@@ -67,13 +59,21 @@ pub fn calculate_realized_loss(
     }
 }
 
-// minimum collateral needed to keep the position safe 
+// minimum collateral needed to keep the position safe
 pub fn calculate_required_margin(
     position_size: u64,
     liquidation_threshold_bps: u64,
 ) -> Result<u64> {
     position_size
         .checked_mul(liquidation_threshold_bps)
+        .ok_or(SolPerpError::MathOverflow)?
+        .checked_div(10_000)
+        .ok_or(SolPerpError::MathOverflow.into())
+}
+
+pub fn calculate_trading_fee(position_size: u64, trading_fees_bps: u64) -> Result<u64> {
+    position_size
+        .checked_mul(trading_fees_bps)
         .ok_or(SolPerpError::MathOverflow)?
         .checked_div(10_000)
         .ok_or(SolPerpError::MathOverflow.into())

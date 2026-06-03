@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::constants::MARKET_SEED;
+use crate::constants::{MARKET_SEED, MAX_LEVERAGE_CAP};
 use crate::error::SolPerpError;
 use crate::state::Market;
 
@@ -23,7 +23,10 @@ pub fn update_market_config_handler(
     liquidation_threshold_bps: u64,
     trading_fees_bps: u64,
 ) -> Result<()> {
-    require!(max_leverage > 0, SolPerpError::InvalidMaxLeverage);
+    require!(
+        max_leverage > 0 && max_leverage <= MAX_LEVERAGE_CAP,
+        SolPerpError::InvalidMaxLeverage
+    );
 
     require!(
         liquidation_threshold_bps > 0 && liquidation_threshold_bps < 10_000,

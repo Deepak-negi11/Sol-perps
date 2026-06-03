@@ -8,6 +8,9 @@ skip-lint = false
 [programs.localnet]
 solperp_anchor = "7oYnX6upn2jhobcxUoarHs7MyyiF7ieZgzMGcjfQhrrD"
 
+[programs.devnet]
+solperp_anchor = "7oYnX6upn2jhobcxUoarHs7MyyiF7ieZgzMGcjfQhrrD"
+
 [provider]
 cluster = "localnet"
 wallet = "~/.config/solana/id.json"
@@ -31,4 +34,3 @@ filename = "programs/solperp-anchor/tests/fixtures/price_update_close.json"
 [[test.validator.account]]
 address = "22uBBYZwcKenxnRcn9tcH1hLWNsTfLJTJFvMJUvKqehY"
 filename = "programs/solperp-anchor/tests/fixtures/price_update_liq.json"
-

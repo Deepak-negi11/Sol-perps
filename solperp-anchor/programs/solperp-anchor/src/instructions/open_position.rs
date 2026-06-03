@@ -2,8 +2,9 @@ use anchor_lang::prelude::*;
 
 use crate::constants::{MARKET_SEED, POSITION_SEED, USER_COLLATERAL_SEED};
 use crate::error::SolPerpError;
-use crate::state::{Market, Position, PositionSide, UserCollateral};
 use crate::event::PositionOpened;
+use crate::math::calculate_trading_fee;
+use crate::state::{Market, Position, PositionSide, UserCollateral};
 
 #[derive(Accounts)]
 pub struct OpenPosition<'info> {
@@ -44,8 +45,6 @@ pub struct OpenPosition<'info> {
     )]
     pub position: Account<'info, Position>,
 
-
-
     #[account(mut)]
     pub user: Signer<'info>,
 
@@ -65,7 +64,10 @@ pub fn open_position_handler(
         leverage <= ctx.accounts.market.max_leverage,
         SolPerpError::InvalidLeverage
     );
-    require!(!ctx.accounts.position.is_open, SolPerpError::PositionAlreadyOpen);
+    require!(
+        !ctx.accounts.position.is_open,
+        SolPerpError::PositionAlreadyOpen
+    );
     // Read entry price from Pyth oracle
     let entry_price = crate::oracle::get_price_from_pyth(
         &ctx.accounts.price_update,
@@ -83,24 +85,69 @@ pub fn open_position_handler(
         SolPerpError::InsufficientAvailableCollateral
     );
 
-    let position_size = collateral
+    let trading_fee = calculate_trading_fee(collateral, ctx.accounts.market.trading_fees_bps)?;
+
+    let position_collateral_after_fee = collateral
+        .checked_sub(trading_fee)
+        .ok_or(SolPerpError::MathOverflow)?;
+
+    require!(
+        position_collateral_after_fee > 0,
+        SolPerpError::InvalidPositionCollateral
+    );
+
+    let position_size = position_collateral_after_fee
         .checked_mul(leverage)
         .ok_or(SolPerpError::MathOverflow)?;
 
     user_collateral.locked_amount = user_collateral
         .locked_amount
-        .checked_add(collateral)
+        .checked_add(position_collateral_after_fee)
         .ok_or(SolPerpError::MathOverflow)?;
+
+    user_collateral.deposited_amount = user_collateral
+        .deposited_amount
+        .checked_sub(trading_fee)
+        .ok_or(SolPerpError::MathOverflow)?;
+
+    ctx.accounts.market.total_trading_fees_collected = ctx
+        .accounts
+        .market
+        .total_trading_fees_collected
+        .checked_add(trading_fee)
+        .ok_or(SolPerpError::MathOverflow)?;
+
+    match side {
+        PositionSide::Long => {
+            ctx.accounts.market.open_interest_long = ctx
+                .accounts
+                .market
+                .open_interest_long
+                .checked_add(position_size)
+                .ok_or(SolPerpError::MathOverflow)?;
+        }
+        PositionSide::Short => {
+            ctx.accounts.market.open_interest_short = ctx
+                .accounts
+                .market
+                .open_interest_short
+                .checked_add(position_size)
+                .ok_or(SolPerpError::MathOverflow)?;
+        }
+    }
+
+    let now = Clock::get()?.unix_timestamp;
 
     let position = &mut ctx.accounts.position;
 
     position.owner = ctx.accounts.user.key();
     position.market = ctx.accounts.market.key();
     position.side = side;
-    position.collateral = collateral;
+    position.collateral = position_collateral_after_fee;
     position.leverage = leverage;
     position.position_size = position_size;
     position.entry_price = entry_price;
+    position.opened_at = now;
     position.is_open = true;
     position.bump = ctx.bumps.position;
 

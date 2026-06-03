@@ -38,4 +38,18 @@ pub enum SolPerpError {
     MarketPaused,
     #[msg("Only market admin can perform this action")]
     UnauthorizedAdmin,
+    #[msg("Insufficient pool balance to pay trader profit")]
+    InsufficientPoolBalance,
+    #[msg("Liquidity amount must be greater than zero")]
+    InvalidLiquidityAmount,
+    #[msg("Order id does not match market next order id")]
+    InvalidOrderId,
+    #[msg("Trigger price must be greater than zero")]
+    InvalidTriggerPrice,
+    #[msg("Invalid order type for this instruction")]
+    InvalidOrderType,
+    #[msg("Trigger condition has not been met")]
+    TriggerConditionNotMet,
+    #[msg("Order is not active")]
+    OrderNotActive,
 }
