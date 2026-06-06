@@ -1,0 +1,12 @@
+{
+  "scripts": {
+    "setup:markets": "bun scripts/setup-markets.ts",
+    "update:market-risk": "bun scripts/update-market-risk.ts"
+  },
+  "dependencies": {
+    "@coral-xyz/anchor": "^0.32.1",
+    "@solana/spl-token": "^0.4.14",
+    "@solana/wallet-adapter-react": "^0.15.39",
+    "@solana/web3.js": "^1.98.4"
+  }
+}

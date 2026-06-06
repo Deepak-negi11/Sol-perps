@@ -3,6 +3,7 @@ use anchor_lang::prelude::*;
 use crate::constants::{MARKET_SEED, ORDER_SEED, USER_COLLATERAL_SEED};
 use crate::error::SolPerpError;
 use crate::event::TriggerOrderPlaced;
+use crate::math::{calculate_required_margin, calculate_trading_fee};
 use crate::state::{Market, OrderType, PositionSide, TriggerCondition, TriggerOrder, UserCollateral};
 
 #[derive(Accounts)]
@@ -10,7 +11,7 @@ use crate::state::{Market, OrderType, PositionSide, TriggerCondition, TriggerOrd
 pub struct PlaceLimitOrder<'info> {
     #[account(
         mut,
-        seeds = [MARKET_SEED],
+        seeds = [MARKET_SEED, market.price_feed_id.as_ref()],
         bump = market.bump
     )]
     pub market: Account<'info, Market>,
@@ -19,12 +20,10 @@ pub struct PlaceLimitOrder<'info> {
         mut,
         seeds = [
             USER_COLLATERAL_SEED,
-            market.key().as_ref(),
             user.key().as_ref()
         ],
         bump = user_collateral.bump,
         constraint = user_collateral.owner == user.key(),
-        constraint = user_collateral.market == market.key(),
         constraint = user_collateral.collateral_mint == market.collateral_mint
     )]
     pub user_collateral: Account<'info, UserCollateral>,
@@ -82,6 +81,20 @@ pub fn place_limit_order_handler(
         SolPerpError::InsufficientAvailableCollateral
     );
 
+    let trading_fee = calculate_trading_fee(collateral, ctx.accounts.market.trading_fees_bps)?;
+    let position_collateral = collateral
+        .checked_sub(trading_fee)
+        .ok_or(SolPerpError::MathOverflow)?;
+    let position_size = position_collateral
+        .checked_mul(leverage)
+        .ok_or(SolPerpError::MathOverflow)?;
+    let required_margin =
+        calculate_required_margin(position_size, ctx.accounts.market.liquidation_threshold_bps)?;
+    require!(
+        position_collateral > required_margin,
+        SolPerpError::InvalidLeverage
+    );
+
     user_collateral.locked_amount = user_collateral
         .locked_amount
         .checked_add(collateral)
@@ -93,6 +106,7 @@ pub fn place_limit_order_handler(
     order.owner = ctx.accounts.user.key();
     order.market = market_key;
     order.order_id = order_id;
+    order.position_id = order_id;
     order.order_type = OrderType::Limit;
     order.side = side;
     order.trigger_condition = trigger_condition;

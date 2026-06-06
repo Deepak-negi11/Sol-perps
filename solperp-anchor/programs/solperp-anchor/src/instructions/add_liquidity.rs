@@ -1,3 +1,4 @@
+// this is used to add fund to the pool or you can say vault token account
 use anchor_lang::prelude::*;
 use anchor_spl::{
     associated_token::AssociatedToken,
@@ -13,7 +14,7 @@ use crate::state::Market;
 pub struct AddLiquidity<'info> {
     #[account(
         mut,
-        seeds = [MARKET_SEED],
+        seeds = [MARKET_SEED, market.price_feed_id.as_ref()],
         bump = market.bump,
         constraint = market.admin == admin.key() @ SolPerpError::UnauthorizedAdmin,
         constraint = market.collateral_mint == collateral_mint.key()

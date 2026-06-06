@@ -1,3 +1,4 @@
+// use to cancel the any active order
 use anchor_lang::prelude::*;
 
 use crate::constants::{MARKET_SEED, ORDER_SEED, USER_COLLATERAL_SEED};
@@ -9,7 +10,7 @@ use crate::state::{Market, OrderType, TriggerOrder, UserCollateral};
 #[instruction(order_id: u64)]
 pub struct CancelTriggerOrder<'info> {
     #[account(
-        seeds = [MARKET_SEED],
+        seeds = [MARKET_SEED, market.price_feed_id.as_ref()],
         bump = market.bump
     )]
     pub market: Account<'info, Market>,
@@ -18,12 +19,10 @@ pub struct CancelTriggerOrder<'info> {
         mut,
         seeds = [
             USER_COLLATERAL_SEED,
-            market.key().as_ref(),
             user.key().as_ref()
         ],
         bump = user_collateral.bump,
         constraint = user_collateral.owner == user.key(),
-        constraint = user_collateral.market == market.key(),
         constraint = user_collateral.collateral_mint == market.collateral_mint
     )]
     pub user_collateral: Account<'info, UserCollateral>,

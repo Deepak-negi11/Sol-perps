@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use std::io::Write;
 
-pub const MAXIMUM_PRICE_AGE_SECONDS: u64 = 30;
+pub const MAXIMUM_PRICE_AGE_SECONDS: u64 = 300;
 pub const MAX_CONFIDENCE_BPS: i64 = 100;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Debug, PartialEq)]
@@ -31,7 +31,7 @@ pub struct PriceUpdateV2 {
 }
 
 impl anchor_lang::Discriminator for PriceUpdateV2 {
-    const DISCRIMINATOR: &'static [u8] = &[2, 55, 172, 194, 219, 150, 241, 169];
+    const DISCRIMINATOR: &'static [u8] = &[34, 241, 35, 99, 157, 126, 244, 205];
 }
 
 impl anchor_lang::Owner for PriceUpdateV2 {

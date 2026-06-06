@@ -9,6 +9,8 @@ test-ledger/
 # Env & Secrets
 .env
 .env.*
+temp-airdrop.json
+**/temp-airdrop.json
 
 # OS files
 .DS_Store
@@ -18,3 +20,13 @@ Thumbs.db
 **/*.rs.bk
 .yarn/
 .surfpool/
+
+# Local agent/tooling files
+.agents/
+**/.agents/
+**/.qa-*.png
+perp-frontend/AGENTS.md
+perp-frontend/CLAUDE.md
+*.swp
+perp-frontend/AGENTS.md
+perp-frontend/CLAUDE.md

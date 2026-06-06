@@ -4,7 +4,7 @@ use anchor_spl::{
     token_interface::{self, Mint, TokenAccount, TokenInterface, TransferChecked},
 };
 
-use crate::constants::{USER_COLLATERAL_SEED, VAULT_SEED};
+use crate::constants::{MARKET_SEED, USER_COLLATERAL_SEED, VAULT_SEED};
 use crate::error::SolPerpError;
 use crate::event::CollateralDeposited;
 use crate::state::{Market, UserCollateral};
@@ -13,7 +13,7 @@ use crate::state::{Market, UserCollateral};
 pub struct DepositCollateral<'info> {
     #[account(
         mut,
-        seeds = [b"market"],
+        seeds = [MARKET_SEED, market.price_feed_id.as_ref()],
         bump = market.bump,
         constraint = market.collateral_mint == collateral_mint.key()
     )]
@@ -25,7 +25,6 @@ pub struct DepositCollateral<'info> {
         space = 8 + UserCollateral::INIT_SPACE,
         seeds = [
             USER_COLLATERAL_SEED,
-            market.key().as_ref(),
             user.key().as_ref()
         ],
         bump
@@ -69,6 +68,11 @@ pub struct DepositCollateral<'info> {
 
 pub fn deposit_collateral_handler(ctx: Context<DepositCollateral>, amount: u64) -> Result<()> {
     require!(amount > 0, SolPerpError::InvalidDepositAmount);
+    require!(
+        ctx.accounts.user_collateral.owner == Pubkey::default()
+            || ctx.accounts.user_collateral.collateral_mint == ctx.accounts.market.collateral_mint,
+        SolPerpError::InvalidCollateralMint
+    );
     let decimals = ctx.accounts.collateral_mint.decimals;
 
     let cpi_accounts = TransferChecked {
@@ -85,7 +89,8 @@ pub fn deposit_collateral_handler(ctx: Context<DepositCollateral>, amount: u64) 
 
     if user_collateral.owner == Pubkey::default() {
         user_collateral.owner = ctx.accounts.user.key();
-        user_collateral.market = ctx.accounts.market.key();
+        // The USDC margin account is shared by every market using this mint.
+        user_collateral.market = Pubkey::default();
         user_collateral.collateral_mint = ctx.accounts.collateral_mint.key();
         user_collateral.bump = ctx.bumps.user_collateral;
     }

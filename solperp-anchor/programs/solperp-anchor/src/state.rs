@@ -53,6 +53,7 @@ pub enum TriggerCondition {
 pub struct Position {
     pub owner: Pubkey,
     pub market: Pubkey,
+    pub position_id: u64,
     pub side: PositionSide,
     pub collateral: u64,
     pub leverage: u64,
@@ -69,6 +70,7 @@ pub struct TriggerOrder {
     pub owner: Pubkey,
     pub market: Pubkey,
     pub order_id: u64,
+    pub position_id: u64,
     pub order_type: OrderType,
     pub side: PositionSide,
     pub trigger_condition: TriggerCondition,

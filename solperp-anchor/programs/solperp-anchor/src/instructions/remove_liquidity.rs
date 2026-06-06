@@ -13,7 +13,7 @@ use crate::state::Market;
 pub struct RemoveLiquidity<'info> {
     #[account(
         mut,
-        seeds = [MARKET_SEED],
+        seeds = [MARKET_SEED, market.price_feed_id.as_ref()],
         bump = market.bump,
         constraint = market.admin == admin.key() @ SolPerpError::UnauthorizedAdmin,
         constraint = market.collateral_mint == collateral_mint.key()

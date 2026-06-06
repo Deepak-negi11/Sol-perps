@@ -42,13 +42,18 @@ pub mod solperp_anchor {
         withdraw_collateral::withdraw_collateral_handler(ctx, amount)
     }
 
+    pub fn migrate_legacy_collateral(ctx: Context<MigrateLegacyCollateral>) -> Result<()> {
+        migrate_legacy_collateral_handler(ctx)
+    }
+
     pub fn open_position(
         ctx: Context<OpenPosition>,
+        position_id: u64,
         side: PositionSide,
         collateral: u64,
         leverage: u64,
     ) -> Result<()> {
-        open_position::open_position_handler(ctx, side, collateral, leverage)
+        open_position::open_position_handler(ctx, position_id, side, collateral, leverage)
     }
 
     pub fn close_position(ctx: Context<ClosePosition>) -> Result<()> {
@@ -115,11 +120,19 @@ pub mod solperp_anchor {
     pub fn place_tp_sl_order(
         ctx: Context<PlaceTpSlOrder>,
         order_id: u64,
+        position_id: u64,
         order_type: OrderType,
         trigger_price: u64,
         trigger_condition: TriggerCondition,
     ) -> Result<()> {
-        place_tp_sl_order_handler(ctx, order_id, order_type, trigger_price, trigger_condition)
+        place_tp_sl_order_handler(
+            ctx,
+            order_id,
+            position_id,
+            order_type,
+            trigger_price,
+            trigger_condition,
+        )
     }
 
     pub fn cancel_trigger_order(

@@ -1,4 +1,4 @@
-use crate::constants::{MARKET_SEED, POSITION_SEED, USER_COLLATERAL_SEED};
+use crate::constants::{MARKET_SEED, USER_COLLATERAL_SEED};
 use crate::error::SolPerpError;
 use crate::event::PositionLiquidated;
 use crate::math::{calculate_pnl, calculate_remaining_collateral, calculate_required_margin};
@@ -8,7 +8,7 @@ use anchor_lang::prelude::*;
 pub struct LiquidatePosition<'info> {
     #[account(
         mut,
-        seeds = [MARKET_SEED],
+        seeds = [MARKET_SEED, market.price_feed_id.as_ref()],
         bump = market.bump
     )]
     pub market: Account<'info, Market>,
@@ -17,24 +17,16 @@ pub struct LiquidatePosition<'info> {
         mut,
         seeds = [
             USER_COLLATERAL_SEED,
-            market.key().as_ref(),
             position.owner.as_ref()
         ],
         bump = user_collateral.bump,
         constraint = user_collateral.owner == position.owner,
-        constraint = user_collateral.market == market.key(),
         constraint = user_collateral.collateral_mint == market.collateral_mint
     )]
     pub user_collateral: Account<'info, UserCollateral>,
 
     #[account(
         mut,
-        seeds = [
-            POSITION_SEED,
-            market.key().as_ref(),
-            position.owner.as_ref()
-        ],
-        bump = position.bump,
         constraint = position.market == market.key()
     )]
     pub position: Account<'info, Position>,

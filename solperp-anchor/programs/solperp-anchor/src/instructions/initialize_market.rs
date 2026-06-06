@@ -6,12 +6,18 @@ use anchor_lang::prelude::*;
 use anchor_spl::token_interface::Mint;
 
 #[derive(Accounts)]
+#[instruction(
+    max_leverage: u64,
+    liquidation_threshold_bps: u64,
+    trading_fees_bps: u64,
+    price_feed_id: [u8; 32]
+)]
 pub struct InitializeMarket<'info> {
     #[account(
         init,
         payer = admin,
         space = 8 + Market::INIT_SPACE,
-        seeds = [MARKET_SEED],
+        seeds = [MARKET_SEED, price_feed_id.as_ref()],
         bump
     )]
     pub market: Account<'info, Market>,

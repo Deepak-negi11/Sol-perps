@@ -1,9 +1,16 @@
 {
   "dependencies": {
     "@coral-xyz/anchor": "^0.32.1",
+    "@pythnetwork/hermes-client": "^3.1.0",
+    "@pythnetwork/pyth-solana-receiver": "^0.16.0",
+    "@solana/web3.js": "^1.98.4",
     "dotenv": "^17.4.2"
   },
   "scripts": {
-    "liquidator": "bun liquidator.ts"
+    "keeper": "bun liquidator.ts",
+    "keeper:dry": "DRY_RUN=true bun liquidator.ts",
+    "liquidator": "bun liquidator.ts",
+    "liquidator:dry": "DRY_RUN=true bun liquidator.ts",
+    "typecheck": "tsc --noEmit --target ES2022 --module Node16 --moduleResolution Node16 --esModuleInterop --skipLibCheck --types node liquidator.ts"
   }
 }

@@ -3,14 +3,15 @@ use anchor_lang::prelude::*;
 use crate::constants::{MARKET_SEED, POSITION_SEED, USER_COLLATERAL_SEED};
 use crate::error::SolPerpError;
 use crate::event::PositionOpened;
-use crate::math::calculate_trading_fee;
+use crate::math::{calculate_required_margin, calculate_trading_fee};
 use crate::state::{Market, Position, PositionSide, UserCollateral};
 
 #[derive(Accounts)]
+#[instruction(position_id: u64)]
 pub struct OpenPosition<'info> {
     #[account(
         mut,
-        seeds = [MARKET_SEED],
+        seeds = [MARKET_SEED, market.price_feed_id.as_ref()],
         bump = market.bump
     )]
     pub market: Account<'info, Market>,
@@ -22,12 +23,10 @@ pub struct OpenPosition<'info> {
         mut,
         seeds = [
             USER_COLLATERAL_SEED,
-            market.key().as_ref(),
             user.key().as_ref()
         ],
         bump = user_collateral.bump,
         constraint = user_collateral.owner == user.key(),
-        constraint = user_collateral.market == market.key(),
         constraint = user_collateral.collateral_mint == market.collateral_mint
     )]
     pub user_collateral: Account<'info, UserCollateral>,
@@ -39,7 +38,8 @@ pub struct OpenPosition<'info> {
         seeds = [
             POSITION_SEED,
             market.key().as_ref(),
-            user.key().as_ref()
+            user.key().as_ref(),
+            &position_id.to_le_bytes()
         ],
         bump
     )]
@@ -53,6 +53,7 @@ pub struct OpenPosition<'info> {
 
 pub fn open_position_handler(
     ctx: Context<OpenPosition>,
+    position_id: u64,
     side: PositionSide,
     collateral: u64,
     leverage: u64,
@@ -99,6 +100,12 @@ pub fn open_position_handler(
     let position_size = position_collateral_after_fee
         .checked_mul(leverage)
         .ok_or(SolPerpError::MathOverflow)?;
+    let required_margin =
+        calculate_required_margin(position_size, ctx.accounts.market.liquidation_threshold_bps)?;
+    require!(
+        position_collateral_after_fee > required_margin,
+        SolPerpError::InvalidLeverage
+    );
 
     user_collateral.locked_amount = user_collateral
         .locked_amount
@@ -142,6 +149,7 @@ pub fn open_position_handler(
 
     position.owner = ctx.accounts.user.key();
     position.market = ctx.accounts.market.key();
+    position.position_id = position_id;
     position.side = side;
     position.collateral = position_collateral_after_fee;
     position.leverage = leverage;

@@ -12,7 +12,7 @@ solperp_anchor = "7oYnX6upn2jhobcxUoarHs7MyyiF7ieZgzMGcjfQhrrD"
 solperp_anchor = "7oYnX6upn2jhobcxUoarHs7MyyiF7ieZgzMGcjfQhrrD"
 
 [provider]
-cluster = "localnet"
+cluster = "devnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]

@@ -1,27 +1,21 @@
 use anchor_lang::prelude::*;
 
-use crate::constants::{MARKET_SEED, ORDER_SEED, POSITION_SEED};
+use crate::constants::{MARKET_SEED, ORDER_SEED};
 use crate::error::SolPerpError;
 use crate::event::TriggerOrderPlaced;
 use crate::state::{Market, OrderType, Position, TriggerCondition, TriggerOrder};
 
 #[derive(Accounts)]
-#[instruction(order_id: u64)]
+#[instruction(order_id: u64, position_id: u64)]
 pub struct PlaceTpSlOrder<'info> {
     #[account(
         mut,
-        seeds = [MARKET_SEED],
+        seeds = [MARKET_SEED, market.price_feed_id.as_ref()],
         bump = market.bump
     )]
     pub market: Account<'info, Market>,
 
     #[account(
-        seeds = [
-            POSITION_SEED,
-            market.key().as_ref(),
-            user.key().as_ref()
-        ],
-        bump = position.bump,
         constraint = position.owner == user.key(),
         constraint = position.market == market.key()
     )]
@@ -50,6 +44,7 @@ pub struct PlaceTpSlOrder<'info> {
 pub fn place_tp_sl_order_handler(
     ctx: Context<PlaceTpSlOrder>,
     order_id: u64,
+    position_id: u64,
     order_type: OrderType,
     trigger_price: u64,
     trigger_condition: TriggerCondition,
@@ -64,6 +59,10 @@ pub fn place_tp_sl_order_handler(
         SolPerpError::InvalidOrderType
     );
     require!(ctx.accounts.position.is_open, SolPerpError::PositionNotOpen);
+    require!(
+        ctx.accounts.position.position_id == position_id,
+        SolPerpError::PositionNotOpen
+    );
     require!(trigger_price > 0, SolPerpError::InvalidTriggerPrice);
 
     let now = Clock::get()?.unix_timestamp;
@@ -72,6 +71,7 @@ pub fn place_tp_sl_order_handler(
     order.owner = ctx.accounts.user.key();
     order.market = market_key;
     order.order_id = order_id;
+    order.position_id = position_id;
     order.order_type = order_type;
     order.side = ctx.accounts.position.side;
     order.trigger_condition = trigger_condition;

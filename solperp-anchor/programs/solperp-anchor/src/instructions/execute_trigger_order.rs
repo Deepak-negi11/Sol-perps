@@ -3,7 +3,9 @@ use anchor_lang::prelude::*;
 use crate::constants::{MARKET_SEED, ORDER_SEED, POSITION_SEED, USER_COLLATERAL_SEED};
 use crate::error::SolPerpError;
 use crate::event::{PositionClosed, PositionOpened, TriggerOrderExecuted};
-use crate::math::{calculate_pnl, calculate_realized_loss, calculate_trading_fee};
+use crate::math::{
+    calculate_pnl, calculate_realized_loss, calculate_required_margin, calculate_trading_fee,
+};
 use crate::state::{
     Market, OrderType, Position, PositionSide, TriggerCondition, TriggerOrder, UserCollateral,
 };
@@ -13,7 +15,7 @@ use crate::state::{
 pub struct ExecuteTriggerOrder<'info> {
     #[account(
         mut,
-        seeds = [MARKET_SEED],
+        seeds = [MARKET_SEED, market.price_feed_id.as_ref()],
         bump = market.bump
     )]
     pub market: Account<'info, Market>,
@@ -28,12 +30,10 @@ pub struct ExecuteTriggerOrder<'info> {
         mut,
         seeds = [
             USER_COLLATERAL_SEED,
-            market.key().as_ref(),
             owner.key().as_ref()
         ],
         bump = user_collateral.bump,
         constraint = user_collateral.owner == owner.key(),
-        constraint = user_collateral.market == market.key(),
         constraint = user_collateral.collateral_mint == market.collateral_mint
     )]
     pub user_collateral: Account<'info, UserCollateral>,
@@ -45,7 +45,8 @@ pub struct ExecuteTriggerOrder<'info> {
         seeds = [
             POSITION_SEED,
             market.key().as_ref(),
-            owner.key().as_ref()
+            owner.key().as_ref(),
+            &order.position_id.to_le_bytes()
         ],
         bump
     )]
@@ -148,6 +149,14 @@ fn execute_limit_order(ctx: &mut Context<ExecuteTriggerOrder>, entry_price: u64)
     let position_size = position_collateral
         .checked_mul(ctx.accounts.order.leverage)
         .ok_or(SolPerpError::MathOverflow)?;
+    let required_margin = calculate_required_margin(
+        position_size,
+        ctx.accounts.market.liquidation_threshold_bps,
+    )?;
+    require!(
+        position_collateral > required_margin,
+        SolPerpError::InvalidLeverage
+    );
 
     ctx.accounts.user_collateral.locked_amount = ctx
         .accounts
@@ -181,6 +190,7 @@ fn execute_limit_order(ctx: &mut Context<ExecuteTriggerOrder>, entry_price: u64)
     let position = &mut ctx.accounts.position;
     position.owner = ctx.accounts.owner.key();
     position.market = ctx.accounts.market.key();
+    position.position_id = ctx.accounts.order.position_id;
     position.side = ctx.accounts.order.side;
     position.collateral = position_collateral;
     position.leverage = ctx.accounts.order.leverage;

@@ -1,4 +1,4 @@
-use crate::constants::{USER_COLLATERAL_SEED, VAULT_SEED};
+use crate::constants::{MARKET_SEED, USER_COLLATERAL_SEED, VAULT_SEED};
 use crate::error::SolPerpError;
 use crate::state::{Market, UserCollateral};
 use anchor_lang::prelude::*;
@@ -11,7 +11,7 @@ use anchor_spl::{
 pub struct WithdrawCollateral<'info> {
     #[account(
         mut,
-        seeds = [b"market"],
+        seeds = [MARKET_SEED, market.price_feed_id.as_ref()],
         bump = market.bump,
         constraint = market.collateral_mint == collateral_mint.key()
     )]
@@ -21,12 +21,10 @@ pub struct WithdrawCollateral<'info> {
         mut,
         seeds = [
             USER_COLLATERAL_SEED,
-            market.key().as_ref(),
             user.key().as_ref()
         ],
         bump = user_collateral.bump,
         constraint = user_collateral.owner == user.key(),
-        constraint = user_collateral.market == market.key(),
         constraint = user_collateral.collateral_mint == market.collateral_mint
     )]
     pub user_collateral: Account<'info, UserCollateral>,

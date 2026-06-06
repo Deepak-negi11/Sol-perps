@@ -52,4 +52,6 @@ pub enum SolPerpError {
     TriggerConditionNotMet,
     #[msg("Order is not active")]
     OrderNotActive,
+    #[msg("Collateral mint does not match the shared margin account")]
+    InvalidCollateralMint,
 }
