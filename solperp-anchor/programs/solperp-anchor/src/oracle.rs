@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use std::io::Write;
 
 pub const MAXIMUM_PRICE_AGE_SECONDS: u64 = 300;
-pub const MAX_CONFIDENCE_BPS: i64 = 100;
+pub const MAX_CONFIDENCE_BPS: i64 = 50;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Debug, PartialEq)]
 pub enum VerificationLevel {
@@ -18,6 +18,7 @@ pub struct PriceFeedMessage {
     pub exponent: i32,
     pub publish_time: i64,
     pub prev_publish_time: i64,
+    // if price move very quick this moves slow
     pub ema_price: i64,
     pub ema_conf: u64,
 }

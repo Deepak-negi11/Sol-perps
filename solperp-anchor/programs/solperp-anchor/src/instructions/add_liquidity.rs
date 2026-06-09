@@ -11,7 +11,8 @@ use crate::event::LiquidityAdded;
 use crate::state::Market;
 
 #[derive(Accounts)]
-pub struct AddLiquidity<'info> {
+pub struct AddLiquidity<'info> 
+    // we derive the market pda herre 
     #[account(
         mut,
         seeds = [MARKET_SEED, market.price_feed_id.as_ref()],
@@ -66,9 +67,12 @@ pub fn add_liquidity_handler(ctx: Context<AddLiquidity>, amount: u64) -> Result<
         to: ctx.accounts.vault_token_account.to_account_info(),
         authority: ctx.accounts.admin.to_account_info(),
     };
-
+    
+    // this create a cpi call so that my program can call the token program
     let cpi_context = CpiContext::new(ctx.accounts.token_program.key(), cpi_accounts);
 
+    // this transfer the money 
+    
     token_interface::transfer_checked(cpi_context, amount, decimals)?;
 
     ctx.accounts.market.pool_balance = ctx

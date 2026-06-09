@@ -88,6 +88,7 @@ pub fn deposit_collateral_handler(ctx: Context<DepositCollateral>, amount: u64) 
     let user_collateral = &mut ctx.accounts.user_collateral;
 
     if user_collateral.owner == Pubkey::default() {
+        
         user_collateral.owner = ctx.accounts.user.key();
         // The USDC margin account is shared by every market using this mint.
         user_collateral.market = Pubkey::default();

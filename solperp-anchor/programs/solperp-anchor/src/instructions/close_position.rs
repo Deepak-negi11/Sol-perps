@@ -104,6 +104,7 @@ pub fn close_position_handler(ctx: Context<ClosePosition>) -> Result<()> {
         .ok_or(SolPerpError::MathOverflow)?;
 
     match position.side {
+        // total long posiiton in the market if one or anyone closes that then it get subtracted from the total market
         PositionSide::Long => {
             ctx.accounts.market.open_interest_long = ctx
                 .accounts
