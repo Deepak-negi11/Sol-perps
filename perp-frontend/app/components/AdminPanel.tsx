@@ -134,7 +134,6 @@ export default function AdminPanel({
     }
   };
 
-  // Pause/resume is an emergency switch. It does not close existing positions;
   // it blocks new trading paths according to the contract checks.
   const handlePause = async (pause: boolean) => {
     if (!program || !publicKey) return;
@@ -353,7 +352,7 @@ export default function AdminPanel({
         <div className="admin-title-group">
           <span className="admin-title">Admin Console</span>
           <span className={`admin-badge ${isAdmin ? "admin-badge-active" : ""}`}>
-            {isAdmin ? "🔑 Admin" : "🔒 Read-only"}
+            {isAdmin ? " Admin" : " Read-only"}
           </span>
         </div>
         {isAdmin && (

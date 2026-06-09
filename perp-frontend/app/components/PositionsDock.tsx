@@ -50,7 +50,7 @@ export default function PositionsDock({
     loading: historyLoading,
     error: historyError,
     refetch: refetchHistory,
-  } = useTradeHistory(marketSymbol);
+  } = useTradeHistory();
   const [activeTab, setActiveTab] = useState<TabType>("positions");
   const [closing, setClosing] = useState(false);
   const effectiveTab = activeTab;
@@ -362,7 +362,9 @@ export default function PositionsDock({
             ) : historyLoading ? (
               <div className="dock-empty">Loading trade history...</div>
             ) : historyError ? (
-              <div className="dock-empty">Unable to load trade history</div>
+              <div className="dock-empty" title={historyError}>
+                Unable to load trade history: {historyError}
+              </div>
             ) : history.length ? (
               <div className="positions-table-wrapper">
                 <table className="history-grid-table">
@@ -387,7 +389,7 @@ export default function PositionsDock({
                             ? new Date(item.blockTime * 1000).toLocaleString()
                             : "-"}
                         </td>
-                        <td>{marketSymbol}/USDC</td>
+                        <td>{item.marketSymbol}/USDC</td>
                         <td>
                           <span
                             className={`history-action ${item.action.toLowerCase()}`}
@@ -438,7 +440,7 @@ export default function PositionsDock({
               </div>
             ) : (
               <div className="dock-empty">
-                No trades found for this market
+                No trades found for this wallet
               </div>
             )}
           </div>
