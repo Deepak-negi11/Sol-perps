@@ -26,8 +26,6 @@ export interface MarketData {
 }
 
 export function useMarket(marketSymbol: MarketSymbol = "SOL") {
-  // Market is a singleton PDA for this app. This hook also checks that the
-  // configured program id is actually deployed before trying to fetch accounts.
   const { connection } = useConnection();
   const [market, setMarket] = useState<MarketData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -36,21 +34,17 @@ export function useMarket(marketSymbol: MarketSymbol = "SOL") {
 
   const fetchMarket = useCallback(async () => {
     try {
-      const pda = getMarketPda(marketSymbol);
-      setMarketPda(pda);
+      const marketAddress = getMarketPda(marketSymbol);
+      setMarketPda(marketAddress);
 
-      // If this fails on devnet, the frontend cannot initialize the market yet
-      // because there is no deployed Anchor program to receive the transaction.
-      const programAccount = await connection.getAccountInfo(PROGRAM_ID);
-      if (!programAccount) {
+      const deployedProgram = await connection.getAccountInfo(PROGRAM_ID);
+      if (!deployedProgram) {
         setMarket(null);
         setError("Program not deployed on devnet");
         return;
       }
 
-      // A read-only provider is enough for fetching account data; write actions
-      // use useProgram because they need the connected wallet signer.
-      const dummyWallet = {
+      const readonlyWallet = {
         publicKey: PublicKey.default,
         signTransaction: async <T extends Transaction | VersionedTransaction>(
           tx: T,
@@ -61,20 +55,20 @@ export function useMarket(marketSymbol: MarketSymbol = "SOL") {
           txs: T[],
         ) => txs,
       };
-      const provider = new AnchorProvider(connection, dummyWallet, { commitment: "confirmed" });
+      const provider = new AnchorProvider(connection, readonlyWallet, { commitment: "confirmed" });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const program = new Program(idl as any, provider);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const data = await (program.account as any).market.fetch(pda);
-      setMarket(data as MarketData);
+      const marketAccount = await (program.account as any).market.fetch(marketAddress);
+      setMarket(marketAccount as MarketData);
       setError(null);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      if (msg.includes("Account does not exist")) {
+    } catch (caught: unknown) {
+      const message = caught instanceof Error ? caught.message : String(caught);
+      if (message.includes("Account does not exist")) {
         setMarket(null);
         setError("Market not initialized");
       } else {
-        setError(msg);
+        setError(message);
       }
     } finally {
       setLoading(false);
@@ -82,13 +76,18 @@ export function useMarket(marketSymbol: MarketSymbol = "SOL") {
   }, [connection, marketSymbol]);
 
   useEffect(() => {
-    // Polling keeps the terminal fresh after transactions from this wallet or
-    // from an admin/keeper wallet without needing a websocket subscription.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchMarket();
-    const interval = setInterval(fetchMarket, 5000);
-    return () => clearInterval(interval);
-  }, [fetchMarket]);
+
+    const marketAddress = getMarketPda(marketSymbol);
+    const subscriptionId = connection.onAccountChange(marketAddress, () => fetchMarket(), "confirmed");
+    const safetyTimer = setInterval(fetchMarket, 30_000);
+
+    return () => {
+      connection.removeAccountChangeListener(subscriptionId);
+      clearInterval(safetyTimer);
+    };
+  }, [connection, marketSymbol, fetchMarket]);
 
   const refetch = useCallback(() => {
     fetchMarket();

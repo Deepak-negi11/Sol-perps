@@ -1,7 +1,5 @@
 import { PublicKey } from "@solana/web3.js";
 
-// Frontend chain constants. PROGRAM_ID must match the program that is deployed
-// on devnet, otherwise market/account fetches will show "program not deployed".
 export const PROGRAM_ID = new PublicKey(
   "7oYnX6upn2jhobcxUoarHs7MyyiF7ieZgzMGcjfQhrrD",
 );
@@ -21,8 +19,10 @@ export const MARKET_FEED_IDS: Record<MarketSymbol, string> = {
 };
 
 export const PYTH_SOL_USD_FEED_ID = MARKET_FEED_IDS.SOL;
+
 export const DEVNET_COLLATERAL_MINT =
   "AMdThvkbfjD3ynTLgG6kaTun2obhKyQ1ceqJN1pkTZPq";
+
 export const LEGACY_MARKET_PDA = new PublicKey(
   "BmbtFPVYrjiS5hYC4GaT3cak4zuKD8FV4MEuEjRqoJMR",
 );

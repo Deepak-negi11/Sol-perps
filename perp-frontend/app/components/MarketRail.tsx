@@ -4,7 +4,6 @@ import React from "react";
 
 export type TerminalMarket = "SOL" | "ETH" | "WBTC";
 
-/* Real crypto logo SVGs rendered inline with circular wrappers to match professional badges. */
 const MARKET_ICONS: Record<TerminalMarket, React.ReactNode> = {
   SOL: (
     <div style={{
@@ -93,8 +92,8 @@ export default function MarketRail({
   return (
     <aside className="market-rail" aria-label="Markets">
       {markets.map((market) => {
-        const change = tickers[market.symbol]?.priceChangePercent;
-        const isUp = (change ?? 0) >= 0;
+        const changePercent = tickers[market.symbol]?.priceChangePercent;
+        const isUp = (changePercent ?? 0) >= 0;
 
         return (
           <div className="rail-item" key={market.symbol}>
@@ -111,8 +110,8 @@ export default function MarketRail({
               <span className="rail-token-label">{market.label}</span>
             </button>
             <span className={isUp ? "rail-change up" : "rail-change down"}>
-              {typeof change === "number"
-                ? `${isUp ? "+" : ""}${change.toFixed(2)}%`
+              {typeof changePercent === "number"
+                ? `${isUp ? "+" : ""}${changePercent.toFixed(2)}%`
                 : "-"}
             </span>
           </div>

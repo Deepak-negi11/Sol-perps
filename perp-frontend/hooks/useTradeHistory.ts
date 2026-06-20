@@ -34,13 +34,13 @@ const SIGNATURE_LIMIT_PER_ADDRESS = 100;
 const MAX_SIGNATURES_TO_PARSE = 100;
 const TRANSACTION_BATCH_SIZE = 5;
 
-function asRecord(value: unknown): Record<string, unknown> {
+function asObject(value: unknown): Record<string, unknown> {
   return value && typeof value === "object"
     ? (value as Record<string, unknown>)
     : {};
 }
 
-function bnToNumber(value: unknown): number {
+function toPlainNumber(value: unknown): number {
   if (BN.isBN(value)) return (value as BN).toNumber();
   if (typeof value === "bigint") return Number(value);
   if (typeof value === "number") return value;
@@ -54,7 +54,7 @@ function publicKeyMatches(value: unknown, expected: PublicKey): boolean {
 }
 
 function isLongSide(value: unknown): boolean {
-  const side = asRecord(value);
+  const side = asObject(value);
   return "long" in side || "Long" in side;
 }
 
@@ -79,12 +79,8 @@ export function useTradeHistory() {
         publicKey,
         LEGACY_MARKET_PDA,
       );
-      // Every trade changes the shared collateral ledger, making it the most
-      // reliable and focused source of the user's protocol transactions.
-      // Both current and legacy trades mutate one of these collateral PDAs.
-      // Avoid scanning the wallet address itself because unrelated wallet
-      // activity can crowd trades out and creates unnecessary RPC requests.
       const addresses = [sharedCollateral, legacyCollateral];
+
       const signatureGroups = await Promise.all(
         addresses.map((address) =>
           connection.getSignaturesForAddress(
@@ -104,9 +100,6 @@ export function useTradeHistory() {
         return;
       }
 
-      // Providers may rate-limit or fail individual historical transaction
-      // reads. Fetching small batches and keeping successful responses ensures
-      // one unavailable transaction cannot blank the entire history table.
       const transactions: Array<{
         signature: string;
         transaction: Awaited<ReturnType<typeof connection.getTransaction>>;
@@ -135,68 +128,65 @@ export function useTradeHistory() {
           }
         });
       }
-      const parser = new EventParser(PROGRAM_ID, new BorshCoder(idl as Idl));
+
+      const eventParser = new EventParser(PROGRAM_ID, new BorshCoder(idl as Idl));
       const marketSymbols: MarketSymbol[] = ["SOL", "ETH", "WBTC"];
-      const marketByAddress = new Map(
+      const symbolByMarketAddress = new Map(
         marketSymbols.map((symbol) => [getMarketPda(symbol).toString(), symbol]),
       );
-      marketByAddress.set(LEGACY_MARKET_PDA.toString(), "SOL");
-      const items: TradeHistoryItem[] = [];
+      symbolByMarketAddress.set(LEGACY_MARKET_PDA.toString(), "SOL");
+      const historyItems: TradeHistoryItem[] = [];
 
       transactions.forEach(({ signature, transaction }) => {
         const logs = transaction?.meta?.logMessages;
         if (!transaction || !logs) return;
 
         let eventIndex = 0;
-        for (const event of parser.parseLogs(logs)) {
-          const normalizedName = event.name.toLowerCase();
+        for (const event of eventParser.parseLogs(logs)) {
+          const eventName = event.name.toLowerCase();
           if (
-            normalizedName !== "positionopened" &&
-            normalizedName !== "positionclosed" &&
-            normalizedName !== "positionliquidated"
+            eventName !== "positionopened" &&
+            eventName !== "positionclosed" &&
+            eventName !== "positionliquidated"
           ) {
             continue;
           }
 
-          const data = asRecord(event.data);
+          const data = asObject(event.data);
           if (!publicKeyMatches(data.user, publicKey)) continue;
-          const eventMarket = marketByAddress.get(String(data.market));
-          if (!eventMarket) continue;
+          const marketSymbol = symbolByMarketAddress.get(String(data.market));
+          if (!marketSymbol) continue;
 
-          const isOpened = normalizedName === "positionopened";
-          const isClosed = normalizedName === "positionclosed";
-          items.push({
+          const isOpened = eventName === "positionopened";
+          const isClosed = eventName === "positionclosed";
+          historyItems.push({
             id: `${signature}-${eventIndex}`,
             signature,
             blockTime: transaction.blockTime ?? 0,
-            marketSymbol: eventMarket,
-            action: isOpened
-              ? "Opened"
-              : isClosed
-                ? "Closed"
-                : "Liquidated",
+            marketSymbol,
+            action: isOpened ? "Opened" : isClosed ? "Closed" : "Liquidated",
             isLong: isLongSide(data.side),
             price:
-              bnToNumber(
+              toPlainNumber(
                 data.entryPrice ?? data.exitPrice ?? data.currentPrice,
               ) / 1_000_000,
             collateral: isOpened
-              ? bnToNumber(data.collateral) / 1_000_000
+              ? toPlainNumber(data.collateral) / 1_000_000
               : null,
-            size: isOpened ? bnToNumber(data.positionSize) / 1_000_000 : null,
-            leverage: isOpened ? bnToNumber(data.leverage) : null,
+            size: isOpened ? toPlainNumber(data.positionSize) / 1_000_000 : null,
+            leverage: isOpened ? toPlainNumber(data.leverage) : null,
             pnl: isClosed
-              ? bnToNumber(data.pnl) / 1_000_000
-              : normalizedName === "positionliquidated"
-                ? -(bnToNumber(data.realizedLoss) / 1_000_000)
+              ? toPlainNumber(data.pnl) / 1_000_000
+              : eventName === "positionliquidated"
+                ? -(toPlainNumber(data.realizedLoss) / 1_000_000)
                 : null,
           });
           eventIndex += 1;
         }
       });
 
-      items.sort((a, b) => b.blockTime - a.blockTime);
-      setHistory(items);
+      historyItems.sort((a, b) => b.blockTime - a.blockTime);
+      setHistory(historyItems);
       setError(null);
     } catch (caught) {
       setHistory([]);
@@ -207,6 +197,7 @@ export function useTradeHistory() {
   }, [connection, publicKey]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchHistory();
   }, [fetchHistory]);
 

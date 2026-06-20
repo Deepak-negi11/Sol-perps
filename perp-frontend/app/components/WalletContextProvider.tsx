@@ -12,14 +12,14 @@ import { RPC_ENDPOINT } from "@/lib/constants";
 import "@solana/wallet-adapter-react-ui/styles.css";
 
 export default function WalletContextProvider({ children }: { children: ReactNode }) {
-  const wallets = useMemo(
+  const supportedWallets = useMemo(
     () => [new PhantomWalletAdapter(), new SolflareWalletAdapter()],
     []
   );
 
   return (
     <ConnectionProvider endpoint={RPC_ENDPOINT}>
-      <WalletProvider wallets={wallets} autoConnect>
+      <WalletProvider wallets={supportedWallets} autoConnect>
         <WalletModalProvider>{children}</WalletModalProvider>
       </WalletProvider>
     </ConnectionProvider>

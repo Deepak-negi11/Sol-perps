@@ -56,6 +56,7 @@ export default function AdminPanel({
   const [liquidityAmount, setLiquidityAmount] = useState("");
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setInitFeed(MARKET_FEED_IDS[marketSymbol]);
   }, [marketSymbol]);
 
@@ -72,7 +73,7 @@ export default function AdminPanel({
       const mintPubkey = new PublicKey(initMint);
       const feedBytes = Array.from(Buffer.from(initFeed, "hex"));
 
-      const sig = await program.methods
+      const signature = await program.methods
         .initializeMarket(
           new BN(initMaxLeverage),
           new BN(initLiqBps),
@@ -86,18 +87,17 @@ export default function AdminPanel({
         })
         .rpc();
 
-      addToast("Market initialized successfully!", "success", sig);
+      addToast("Market initialized successfully!", "success", signature);
       onUpdate();
-    } catch (e: unknown) {
+    } catch (error: unknown) {
       addToast(
-        `Failed to initialize: ${e instanceof Error ? e.message : String(e)}`,
+        `Failed to initialize: ${error instanceof Error ? error.message : String(error)}`,
         "error",
       );
     } finally {
       setInitializing(false);
     }
   };
-
 
   const handleUpdateConfig = async () => {
     if (!program || !market || !publicKey) return;
@@ -111,7 +111,7 @@ export default function AdminPanel({
 
       addToast("Updating market config...", "info");
 
-      const sig = await program.methods
+      const signature = await program.methods
         .updateMarketConfig(finalLeverage, finalLiq, finalFee)
         .accounts({
           market: getMarketPda(marketSymbol),
@@ -119,14 +119,14 @@ export default function AdminPanel({
         })
         .rpc();
 
-      addToast("Config updated successfully!", "success", sig);
+      addToast("Config updated successfully!", "success", signature);
       setMaxLeverage("");
       setLiqBps("");
       setFeeBps("");
       onUpdate();
-    } catch (e: unknown) {
+    } catch (error: unknown) {
       addToast(
-        `Failed to update config: ${e instanceof Error ? e.message : String(e)}`,
+        `Failed to update config: ${error instanceof Error ? error.message : String(error)}`,
         "error",
       );
     } finally {
@@ -134,13 +134,12 @@ export default function AdminPanel({
     }
   };
 
-  // it blocks new trading paths according to the contract checks.
   const handlePause = async (pause: boolean) => {
     if (!program || !publicKey) return;
     try {
       addToast(pause ? "Pausing market..." : "Resuming market...", "info");
 
-      const sig = pause
+      const signature = pause
         ? await program.methods
             .pauseMarket()
             .accounts({ market: getMarketPda(marketSymbol), admin: publicKey })
@@ -150,16 +149,15 @@ export default function AdminPanel({
             .accounts({ market: getMarketPda(marketSymbol), admin: publicKey })
             .rpc();
 
-      addToast(pause ? "Market paused!" : "Market resumed!", "success", sig);
+      addToast(pause ? "Market paused!" : "Market resumed!", "success", signature);
       onUpdate();
-    } catch (e: unknown) {
+    } catch (error: unknown) {
       addToast(
-        `Failed: ${e instanceof Error ? e.message : String(e)}`,
+        `Failed: ${error instanceof Error ? error.message : String(error)}`,
         "error",
       );
     }
   };
-
 
   const handleWithdrawFees = async () => {
     if (!program || !market || !publicKey || !withdrawAmount) return;
@@ -180,7 +178,7 @@ export default function AdminPanel({
 
       const lamports = tokenToLamports(parseFloat(withdrawAmount));
 
-      const sig = await program.methods
+      const signature = await program.methods
         .withdrawProtocolFees(lamports)
         .accounts({
           market: marketPda,
@@ -194,12 +192,12 @@ export default function AdminPanel({
         })
         .rpc();
 
-      addToast("Fees withdrawn successfully!", "success", sig);
+      addToast("Fees withdrawn successfully!", "success", signature);
       setWithdrawAmount("");
       onUpdate();
-    } catch (e: unknown) {
+    } catch (error: unknown) {
       addToast(
-        `Failed to withdraw fees: ${e instanceof Error ? e.message : String(e)}`,
+        `Failed to withdraw fees: ${error instanceof Error ? error.message : String(error)}`,
         "error",
       );
     } finally {
@@ -207,8 +205,6 @@ export default function AdminPanel({
     }
   };
 
-  // Liquidity is capital owned by the admin/protocol that backs trader PnL. It
-  // is tracked separately from user collateral deposits.
   const handleLiquidity = async (action: "add" | "remove") => {
     if (!program || !market || !publicKey || !liquidityAmount) return;
     setUpdatingLiquidity(true);
@@ -256,17 +252,17 @@ export default function AdminPanel({
               associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
             });
 
-      const sig = await txBuilder.rpc();
+      const signature = await txBuilder.rpc();
       addToast(
         action === "add" ? "Liquidity added!" : "Liquidity removed!",
         "success",
-        sig,
+        signature,
       );
       setLiquidityAmount("");
       onUpdate();
-    } catch (e: unknown) {
+    } catch (error: unknown) {
       addToast(
-        `Liquidity update failed: ${e instanceof Error ? e.message : String(e)}`,
+        `Liquidity update failed: ${error instanceof Error ? error.message : String(error)}`,
         "error",
       );
     } finally {
@@ -274,7 +270,6 @@ export default function AdminPanel({
     }
   };
 
-  // 1. Market not initialized yet: show setup instead of the normal admin form.
   if (!market) {
     return (
       <div className="setup-console">
@@ -347,7 +342,6 @@ export default function AdminPanel({
 
   return (
     <div className="admin-tab-pane">
-      {/* Header row */}
       <div className="admin-header-row">
         <div className="admin-title-group">
           <span className="admin-title">Admin Console</span>
@@ -365,7 +359,6 @@ export default function AdminPanel({
         )}
       </div>
 
-      {/* Config section */}
       <div className="admin-section">
         <div className="admin-section-label">Parameters</div>
         <div className="admin-config-grid">
@@ -411,7 +404,6 @@ export default function AdminPanel({
         )}
       </div>
 
-      {/* Fees section */}
       <div className="admin-section">
         <div className="admin-section-label">
           Protocol Fees
@@ -442,7 +434,6 @@ export default function AdminPanel({
         )}
       </div>
 
-      {/* Pool section */}
       <div className="admin-section" style={{ borderBottom: "none" }}>
         <div className="admin-section-label">
           Pool Liquidity

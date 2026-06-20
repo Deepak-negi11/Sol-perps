@@ -8,7 +8,7 @@ import { useMarket } from "@/hooks/useMarket";
 import { usePosition } from "@/hooks/usePosition";
 import { usePythPrice } from "@/hooks/usePythPrice";
 import { useUserCollateral } from "@/hooks/useUserCollateral";
-import { formatBps, lamportsToToken } from "@/lib/format";
+import { formatAmount, formatBps, lamportsToToken } from "@/lib/format";
 import MarketRail, { type TerminalMarket } from "./components/MarketRail";
 import AdminPanel from "./components/AdminPanel";
 import PerpChart, { type ChartTimeframe } from "./components/PerpChart";
@@ -22,15 +22,7 @@ const WalletMultiButton = dynamic(
   { ssr: false },
 );
 
-function formatUsd(value: number) {
-  return value.toLocaleString("en-US", {
-    maximumFractionDigits: 2,
-    minimumFractionDigits: 2,
-  });
-}
-
 const TIMEFRAMES: ChartTimeframe[] = ["5m", "15m", "1h"];
-const DEFAULT_MAX_LEVERAGE = 250;
 const DEFAULT_TRADING_FEE_BPS = 10;
 const MARKET_TO_BINANCE_SYMBOL: Record<TerminalMarket, string> = {
   SOL: "SOLUSDC",
@@ -45,9 +37,33 @@ interface MarketTicker {
   quoteVolume: number;
 }
 
+function beginPointerResize(
+  event: React.PointerEvent,
+  axis: "x" | "y",
+  startValue: number,
+  min: number,
+  max: number,
+  onResize: (value: number) => void,
+) {
+  event.preventDefault();
+  const startPointer = axis === "x" ? event.clientX : event.clientY;
+
+  const handleMove = (moveEvent: PointerEvent) => {
+    const pointer = axis === "x" ? moveEvent.clientX : moveEvent.clientY;
+    const next = startValue - (pointer - startPointer);
+    onResize(Math.min(max, Math.max(min, next)));
+  };
+
+  const handleUp = () => {
+    window.removeEventListener("pointermove", handleMove);
+    window.removeEventListener("pointerup", handleUp);
+  };
+
+  window.addEventListener("pointermove", handleMove);
+  window.addEventListener("pointerup", handleUp);
+}
+
 export default function Home() {
-  // This page is the terminal shell. It owns cross-component UI state such as
-  // selected market, chart timeframe, remote tickers, and the resizable ticket.
   const [timeframe, setTimeframe] = useState<ChartTimeframe>("15m");
   const [selectedMarket, setSelectedMarket] = useState<TerminalMarket>("SOL");
   const [ticketWidth, setTicketWidth] = useState(520);
@@ -56,7 +72,8 @@ export default function Home() {
   const [tickers, setTickers] = useState<
     Partial<Record<TerminalMarket, MarketTicker>>
   >({});
-  const { priceData } = usePythPrice(selectedMarket);
+
+  const { priceData, connected } = usePythPrice(selectedMarket);
   const {
     market,
     loading: marketLoading,
@@ -66,8 +83,6 @@ export default function Home() {
   const { refetch: refetchCollateral } = useUserCollateral(selectedMarket);
   const { refetch: refetchPosition } = usePosition(selectedMarket);
 
-  // Binance ticker data is used only for public chart/readout previews. The
-  // real on-chain SOL market still uses the Anchor market PDA and Pyth account.
   useEffect(() => {
     const abort = new AbortController();
 
@@ -119,9 +134,6 @@ export default function Home() {
     ? lamportsToToken(market.openInterestLong.add(market.openInterestShort))
     : 0;
   const poolBalance = market ? lamportsToToken(market.poolBalance) : 0;
-  const maxLeverage = market
-    ? market.maxLeverage.toNumber()
-    : DEFAULT_MAX_LEVERAGE;
   const feeText = formatBps(
     market ? market.tradingFeesBps.toNumber() : DEFAULT_TRADING_FEE_BPS,
   );
@@ -139,57 +151,21 @@ export default function Home() {
   }, [price, timeframe]);
   const isProgramMissing = marketError === "Program not deployed on devnet";
 
-  // Any successful transaction can change several independent PDAs, so refresh
-  // the market, collateral account, and position account together.
   const handleUpdate = () => {
     refetchMarket();
     refetchCollateral();
     refetchPosition();
   };
 
-  // The resize handle sits between the chart and ticket. Dragging left makes the
-  // ticket wider; the clamp keeps the terminal usable on smaller screens.
   const startResize = useCallback(
-    (event: React.PointerEvent<HTMLButtonElement>) => {
-      event.preventDefault();
-      const startX = event.clientX;
-      const startWidth = ticketWidth;
-
-      const handleMove = (moveEvent: PointerEvent) => {
-        const nextWidth = startWidth - (moveEvent.clientX - startX);
-        setTicketWidth(Math.min(700, Math.max(360, nextWidth)));
-      };
-
-      const handleUp = () => {
-        window.removeEventListener("pointermove", handleMove);
-        window.removeEventListener("pointerup", handleUp);
-      };
-
-      window.addEventListener("pointermove", handleMove);
-      window.addEventListener("pointerup", handleUp);
-    },
+    (event: React.PointerEvent<HTMLButtonElement>) =>
+      beginPointerResize(event, "x", ticketWidth, 360, 700, setTicketWidth),
     [ticketWidth],
   );
 
   const startVerticalResize = useCallback(
-    (event: React.PointerEvent<HTMLButtonElement>) => {
-      event.preventDefault();
-      const startY = event.clientY;
-      const startHeight = dockHeight;
-
-      const handleMove = (moveEvent: PointerEvent) => {
-        const nextHeight = startHeight - (moveEvent.clientY - startY);
-        setDockHeight(Math.min(700, Math.max(80, nextHeight)));
-      };
-
-      const handleUp = () => {
-        window.removeEventListener("pointermove", handleMove);
-        window.removeEventListener("pointerup", handleUp);
-      };
-
-      window.addEventListener("pointermove", handleMove);
-      window.addEventListener("pointerup", handleUp);
-    },
+    (event: React.PointerEvent<HTMLButtonElement>) =>
+      beginPointerResize(event, "y", dockHeight, 80, 700, setDockHeight),
     [dockHeight],
   );
 
@@ -210,9 +186,16 @@ export default function Home() {
         </div>
 
         <div className="terminal-actions">
-          <span className="network-chip">
+          <span
+            className="network-chip"
+            style={{
+              color: connected
+                ? "var(--long-green)"
+                : "var(--warning-amber)",
+            }}
+          >
             <Wifi size={14} />
-            Devnet
+            {connected ? "Oracle live" : "Connecting…"}
           </span>
           <button
             className="deposit-btn-header"
@@ -225,18 +208,16 @@ export default function Home() {
       </header>
 
       <main className="terminal-main">
-        {/* Top market strip mixes off-chain ticker data with on-chain market
-            config so the user can see both price and protocol state. */}
         <section className="market-strip" aria-label="Selected market" style={{ gridTemplateColumns: "1fr" }}>
           <div className="market-stat-grid">
             <div>
               <span>Mark Price</span>
-              <strong>${formatUsd(price)}</strong>
+              <strong>${formatAmount(price)}</strong>
             </div>
             <div>
               <span>Oracle Conf</span>
               <strong>
-                ±${formatUsd(confidence)}
+                ±${formatAmount(confidence)}
               </strong>
             </div>
             <div>
@@ -298,8 +279,6 @@ export default function Home() {
           </div>
         ) : null}
 
-        {/* Main terminal layout: market rail, chart/dock stack, resize handle,
-            and the trading ticket. */}
         <div
           className="terminal-workspace"
           style={
@@ -334,10 +313,10 @@ export default function Home() {
                     {marketPair} · {timeframe} · Satr
                   </span>
                   <strong>
-                    O {formatUsd(chartReadout.open)} H{" "}
-                    {formatUsd(chartReadout.high)} L{" "}
-                    {formatUsd(chartReadout.low)} C{" "}
-                    {formatUsd(chartReadout.close)}
+                    O {formatAmount(chartReadout.open)} H{" "}
+                    {formatAmount(chartReadout.high)} L{" "}
+                    {formatAmount(chartReadout.low)} C{" "}
+                    {formatAmount(chartReadout.close)}
                   </strong>
                 </div>
               </div>

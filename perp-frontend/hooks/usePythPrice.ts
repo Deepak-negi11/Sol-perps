@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { MARKET_FEED_IDS, type MarketSymbol } from "@/lib/constants";
+import { HermesClient } from "@pythnetwork/hermes-client";
 
 interface PythPriceData {
   price: number;
@@ -10,52 +11,63 @@ interface PythPriceData {
 }
 
 export function usePythPrice(marketSymbol: MarketSymbol = "SOL") {
-  // Hermes gives the UI a fresh display price. Sending a trade still requires
-  // the on-chain Pyth price update account used by the Anchor instruction.
   const [priceData, setPriceData] = useState<PythPriceData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [connected, setConnected] = useState(false);
 
   useEffect(() => {
-    let cancelled = false;
+    const pythFeedId = `0x${MARKET_FEED_IDS[marketSymbol]}`;
 
-    async function fetchPrice() {
-      try {
-        // This endpoint returns the latest parsed SOL/USD price without needing
-        // the wallet to sign anything.
-        const res = await fetch(
-          `https://hermes.pyth.network/v2/updates/price/latest?ids[]=0x${MARKET_FEED_IDS[marketSymbol]}`
-        );
-        if (!res.ok) {
-          throw new Error(`HTTP error ${res.status}: ${await res.text()}`);
-        }
-        const json = await res.json();
-        if (cancelled) return;
+    const pythServer = new HermesClient("https://hermes.pyth.network");
 
-        const parsed = json.parsed;
-        if (parsed && parsed.length > 0) {
-          const p = parsed[0].price;
-          const price = Number(p.price) * Math.pow(10, p.expo);
-          const confidence = Number(p.conf) * Math.pow(10, p.expo);
+    let priceStream:
+      | Awaited<ReturnType<typeof pythServer.getPriceUpdatesStream>>
+      | null = null;
+
+    let stopped = false;
+
+    async function startStream() {
+      priceStream = await pythServer.getPriceUpdatesStream([pythFeedId], {
+        parsed: true,
+      });
+
+      if (stopped) {
+        priceStream.close();
+        return;
+      }
+
+      priceStream.onmessage = (message) => {
+        const update = JSON.parse(message.data);
+        const parsedPrices = update.parsed;
+
+        if (parsedPrices && parsedPrices.length > 0) {
+          const priceInfo = parsedPrices[0].price;
+
+          const price = Number(priceInfo.price) * Math.pow(10, priceInfo.expo);
+          const confidence =
+            Number(priceInfo.conf) * Math.pow(10, priceInfo.expo);
+
           setPriceData({
             price,
             confidence,
-            publishTime: parsed[0].price.publish_time,
+            publishTime: priceInfo.publish_time,
           });
+          setLoading(false);
+          setConnected(true);
         }
-      } catch (e) {
-        console.error("Failed to fetch Pyth price:", e);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
+      };
+
+      priceStream.onerror = () => setConnected(false);
     }
 
-    fetchPrice();
-    const interval = setInterval(fetchPrice, 5000);
+    startStream();
+
     return () => {
-      cancelled = true;
-      clearInterval(interval);
+      stopped = true;
+      priceStream?.close();
+      setConnected(false);
     };
   }, [marketSymbol]);
 
-  return { priceData, loading };
+  return { priceData, loading, connected };
 }

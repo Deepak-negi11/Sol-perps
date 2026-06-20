@@ -4,11 +4,6 @@ import React, { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { useAnchorWallet, useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { SystemProgram } from "@solana/web3.js";
-import {
-  ASSOCIATED_TOKEN_PROGRAM_ID,
-  TOKEN_PROGRAM_ID,
-  getAssociatedTokenAddress,
-} from "@solana/spl-token";
 import { BN } from "@coral-xyz/anchor";
 import { Minus, Plus } from "lucide-react";
 import { MarketData } from "@/hooks/useMarket";
@@ -20,7 +15,6 @@ import {
   getOrderPda,
   getPositionPda,
   getUserCollateralPda,
-  getVaultAuthorityPda,
 } from "@/lib/pda";
 import { useUserCollateral } from "@/hooks/useUserCollateral";
 import { usePosition } from "@/hooks/usePosition";
@@ -50,24 +44,17 @@ export default function TradeTicket({
   marketLoading = false,
   onUpdate,
 }: TradeTicketProps) {
-  // Wallet/program hooks are the only parts of this component that can send
-  // transactions. Everything below them is local UI state or derived display
-  // state until one of the handler functions is called.
   const { connection } = useConnection();
   const { publicKey } = useWallet();
   const wallet = useAnchorWallet();
   const program = useProgram();
   const {
-    data: userCollateral,
     availableAmount,
     refetch,
   } = useUserCollateral(marketSymbol);
   const { position, refetch: refetchPosition } = usePosition(marketSymbol);
   const { addToast } = useToast();
 
-  // Order form state. "side" and "mode" decide which contract instruction the
-  // submit button calls: openPosition for market orders, placeLimitOrder for
-  // limit orders, and placeTpSlOrder from the TP/SL card below.
   const [side, setSide] = useState<"long" | "short">("long");
   const [mode, setMode] = useState<"market" | "limit">("market");
   const [collateral, setCollateral] = useState("");
@@ -77,8 +64,6 @@ export default function TradeTicket({
   const [leverage, setLeverage] = useState(3);
   const [sending, setSending] = useState(false);
 
-  // Chain values arrive as Anchor BN values in 6-decimal token units, so convert
-  // them once here before using them in inputs, labels, and validation checks.
   const available = lamportsToToken(availableAmount);
   const maintenanceMaxLeverage = market
     ? Math.max(
@@ -101,8 +86,6 @@ export default function TradeTicket({
   const marketPair = `${marketSymbol}/USDC`;
   const nextOrderId = market?.nextOrderId?.toNumber() ?? 0;
 
-  // This summary is display-only. The contract does its own final fee, position
-  // size, and liquidation math when the transaction lands on-chain.
   const summary = useMemo(() => {
     const fee = (parsedCollateral * feeBps) / 10_000;
     const size = Math.max(0, parsedCollateral - fee) * activeLeverage;
@@ -120,8 +103,6 @@ export default function TradeTicket({
     return { fee, size, liq };
   }, [activeLeverage, feeBps, market, parsedCollateral, price, side]);
 
-  // Market orders execute immediately against the oracle price update account.
-  // The UI only supports the real on-chain SOL/USDC market for now.
   const handleOpen = async () => {
     if (!program || !market || !publicKey || !wallet || !parsedCollateral)
       return;
@@ -133,7 +114,7 @@ export default function TradeTicket({
         "Wallet approval covers Pyth price update, trade execution, and cleanup.",
         "info",
       );
-      const [sig] = await sendWithFreshPythPrice({
+      const [signature] = await sendWithFreshPythPrice({
         connection,
         wallet,
         feedId: market.priceFeedId,
@@ -159,7 +140,7 @@ export default function TradeTicket({
           },
         ],
       });
-      addToast("Position opened", "success", sig);
+      addToast("Position opened", "success", signature);
       setCollateral("");
       await refetchPosition();
       onUpdate();
@@ -173,8 +154,6 @@ export default function TradeTicket({
     }
   };
 
-  // Limit orders store an order PDA. A keeper/bot later calls executeTriggerOrder
-  // once the oracle price crosses the above/below trigger condition.
   const handlePlaceLimit = async () => {
     if (!program || !market || !publicKey || !parsedCollateral || !limitPrice)
       return;
@@ -183,7 +162,7 @@ export default function TradeTicket({
       const sideArg = side === "long" ? { long: {} } : { short: {} };
       const triggerCondition = side === "long" ? { below: {} } : { above: {} };
       const orderId = nextOrderId;
-      const sig = await program.methods
+      const signature = await program.methods
         .placeLimitOrder(
           new BN(orderId),
           sideArg,
@@ -200,7 +179,7 @@ export default function TradeTicket({
           systemProgram: SystemProgram.programId,
         })
         .rpc();
-      addToast("Limit order placed", "success", sig);
+      addToast("Limit order placed", "success", signature);
       setCollateral("");
       setLimitPrice("");
       await refetch();
@@ -216,8 +195,6 @@ export default function TradeTicket({
     }
   };
 
-  // TP and SL are also trigger orders, but they attach to an existing position
-  // instead of opening a new one. If both fields are filled we create two PDAs.
   const handlePlaceTpSl = async () => {
     if (!program || !market || !publicKey || !position) return;
     const wantsTp = Boolean(takeProfitPrice);
@@ -230,7 +207,7 @@ export default function TradeTicket({
       let orderId = nextOrderId;
 
       if (wantsTp) {
-        const sig = await program.methods
+        const signature = await program.methods
           .placeTpSlOrder(
             new BN(orderId),
             position.positionId,
@@ -246,12 +223,12 @@ export default function TradeTicket({
             systemProgram: SystemProgram.programId,
           })
           .rpc();
-        addToast("Take-profit order placed", "success", sig);
+        addToast("Take-profit order placed", "success", signature);
         orderId += 1;
       }
 
       if (wantsSl) {
-        const sig = await program.methods
+        const signature = await program.methods
           .placeTpSlOrder(
             new BN(orderId),
             position.positionId,
@@ -267,7 +244,7 @@ export default function TradeTicket({
             systemProgram: SystemProgram.programId,
           })
           .rpc();
-        addToast("Stop-loss order placed", "success", sig);
+        addToast("Stop-loss order placed", "success", signature);
       }
 
       setTakeProfitPrice("");
@@ -284,8 +261,6 @@ export default function TradeTicket({
     }
   };
 
-  // Button guards live close to the JSX so the disabled states and button labels
-  // stay easy to compare. They do not replace contract-side validation.
   const canTrade =
     Boolean(publicKey) &&
     Boolean(market) &&
@@ -305,7 +280,6 @@ export default function TradeTicket({
 
   return (
     <aside className="terminal-panel trade-ticket">
-      {/* Wallet connection state: shown above the ticket controls when disconnected. */}
       {!publicKey ? (
         <div className="connect-state">
           <h2>Connect wallet</h2>
@@ -314,13 +288,11 @@ export default function TradeTicket({
         </div>
       ) : null}
 
-      {/* Margin mode is currently visual only; the contract is cross-margin style. */}
       <div className="ticket-row compact">
         <button className="ticket-pill active">Cross</button>
         <button className="ticket-pill">{activeLeverage}x</button>
       </div>
 
-      {/* Long/short switch decides the PositionSide enum sent to Anchor. */}
       <div className="side-switch">
         <button
           className={side === "long" ? "active long" : ""}
@@ -336,7 +308,6 @@ export default function TradeTicket({
         </button>
       </div>
 
-      {/* Market vs limit switch decides which submit handler is wired below. */}
       <div className="mode-switch">
         <button
           className={mode === "market" ? "active" : ""}
@@ -355,7 +326,6 @@ export default function TradeTicket({
         </span>
       </div>
 
-      {/* Every market currently uses its configured USDC SPL mint as collateral. */}
       <div className="ticket-card">
         <label>Collateral</label>
         <div className="amount-row">
@@ -373,7 +343,6 @@ export default function TradeTicket({
         </div>
       </div>
 
-      {/* Limit price only appears in limit mode because market orders use Pyth. */}
       {mode === "limit" ? (
         <div className="ticket-card">
           <label>Limit price</label>
@@ -393,7 +362,6 @@ export default function TradeTicket({
         </div>
       ) : null}
 
-      {/* Leverage is clamped by the market config fetched from chain. */}
       <div className="leverage-box">
         <button
           onClick={() => setLeverage(Math.max(1, activeLeverage - 1))}
@@ -445,7 +413,6 @@ export default function TradeTicket({
                     : `${side === "long" ? "Long" : "Short"} ${marketPair}`}
       </button>
 
-      {/* TP/SL creates trigger orders for the currently open position. */}
       <div className="ticket-card">
         <label>Take Profit / Stop Loss</label>
         <div className="trigger-order-grid">
@@ -473,7 +440,6 @@ export default function TradeTicket({
         </button>
       </div>
 
-      {/* Preview numbers help the user understand the order before sending it. */}
       <div className="ticket-metrics">
         <div>
           <span>Position size</span>

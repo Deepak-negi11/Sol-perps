@@ -55,7 +55,7 @@ export default function CollateralPanel({ market, marketSymbol, onUpdate, onDepo
     try {
       const lamports = tokenToLamports(parseFloat(amount));
       const marketPda = getMarketPda(marketSymbol);
-      const sig = await program.methods
+      const signature = await program.methods
         .depositCollateral(lamports)
         .accounts({
           market: marketPda,
@@ -64,13 +64,13 @@ export default function CollateralPanel({ market, marketSymbol, onUpdate, onDepo
           tokenProgram: TOKEN_PROGRAM_ID,
         })
         .rpc();
-      addToast("Deposit successful!", "success", sig);
+      addToast("Deposit successful!", "success", signature);
       setAmount("");
       await refetch();
       onUpdate();
       onDepositSuccess?.();
-    } catch (e: unknown) {
-      addToast(`Deposit failed: ${e instanceof Error ? e.message : String(e)}`, "error");
+    } catch (error: unknown) {
+      addToast(`Deposit failed: ${error instanceof Error ? error.message : String(error)}`, "error");
     } finally {
       setSending(false);
     }
@@ -92,7 +92,7 @@ export default function CollateralPanel({ market, marketSymbol, onUpdate, onDepo
         market.collateralMint,
         publicKey
       );
-      const sig = await program.methods
+      const signature = await program.methods
         .withdrawCollateral(lamports)
         .accounts({
           market: marketPda,
@@ -105,12 +105,12 @@ export default function CollateralPanel({ market, marketSymbol, onUpdate, onDepo
           associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
         })
         .rpc();
-      addToast("Withdrawal successful!", "success", sig);
+      addToast("Withdrawal successful!", "success", signature);
       setAmount("");
       await refetch();
       onUpdate();
-    } catch (e: unknown) {
-      addToast(`Withdrawal failed: ${e instanceof Error ? e.message : String(e)}`, "error");
+    } catch (error: unknown) {
+      addToast(`Withdrawal failed: ${error instanceof Error ? error.message : String(error)}`, "error");
     } finally {
       setSending(false);
     }
@@ -120,7 +120,7 @@ export default function CollateralPanel({ market, marketSymbol, onUpdate, onDepo
     if (!program || !publicKey) return;
     setMigrating(true);
     try {
-      const sig = await program.methods
+      const signature = await program.methods
         .migrateLegacyCollateral()
         .accounts({
           legacyMarket: LEGACY_MARKET_PDA,
@@ -133,12 +133,12 @@ export default function CollateralPanel({ market, marketSymbol, onUpdate, onDepo
           systemProgram: SystemProgram.programId,
         })
         .rpc();
-      addToast("Legacy USDC imported into shared margin", "success", sig);
+      addToast("Legacy USDC imported into shared margin", "success", signature);
       await refetch();
       onUpdate();
-    } catch (e: unknown) {
+    } catch (error: unknown) {
       addToast(
-        `Import failed: ${e instanceof Error ? e.message : String(e)}`,
+        `Import failed: ${error instanceof Error ? error.message : String(error)}`,
         "error",
       );
     } finally {

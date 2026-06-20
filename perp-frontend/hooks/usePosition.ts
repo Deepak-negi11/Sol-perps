@@ -10,7 +10,7 @@ import {
   type VersionedTransaction,
 } from "@solana/web3.js";
 import { getMarketPda } from "@/lib/pda";
-import type { MarketSymbol } from "@/lib/constants";
+import { PROGRAM_ID, type MarketSymbol } from "@/lib/constants";
 
 export interface PositionData {
   publicKey: PublicKey;
@@ -28,8 +28,6 @@ export interface PositionData {
 }
 
 export function usePosition(marketSymbol: MarketSymbol = "SOL") {
-  // A wallet can now have multiple open position PDAs. `position` is kept as a
-  // convenience for older components that still need one selected/default row.
   const { connection } = useConnection();
   const { publicKey } = useWallet();
   const [position, setPosition] = useState<PositionData | null>(null);
@@ -44,7 +42,7 @@ export function usePosition(marketSymbol: MarketSymbol = "SOL") {
       return;
     }
     try {
-      const dummyWallet = {
+      const readonlyWallet = {
         publicKey: PublicKey.default,
         signTransaction: async <T extends Transaction | VersionedTransaction>(
           tx: T,
@@ -55,35 +53,37 @@ export function usePosition(marketSymbol: MarketSymbol = "SOL") {
           txs: T[],
         ) => txs,
       };
-      const provider = new AnchorProvider(connection, dummyWallet, {
+      const provider = new AnchorProvider(connection, readonlyWallet, {
         commitment: "confirmed",
       });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const program = new Program(idl as any, provider);
+      const marketAddress = getMarketPda(marketSymbol);
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const marketPda = getMarketPda(marketSymbol);
-      const accounts = await (program.account as any).position.all([
+      const positionAccounts = await (program.account as any).position.all([
         {
           memcmp: {
-            offset: 8, // 8 bytes discriminator, followed by owner pubkey
+            offset: 8,
             bytes: publicKey.toBase58(),
           },
         },
         {
           memcmp: {
-            offset: 40, // discriminator + owner pubkey, followed by market pubkey
-            bytes: marketPda.toBase58(),
+            offset: 40,
+            bytes: marketAddress.toBase58(),
           },
         },
       ]);
-      const openPositions = accounts
+
+      const openPositions = positionAccounts
         .map(
-          (item: { publicKey: PublicKey; account: Omit<PositionData, "publicKey"> }) =>
-            ({ publicKey: item.publicKey, ...item.account }) as PositionData,
+          (entry: { publicKey: PublicKey; account: Omit<PositionData, "publicKey"> }) =>
+            ({ publicKey: entry.publicKey, ...entry.account }) as PositionData,
         )
         .filter(
-          (data: PositionData) =>
-            data.isOpen && data.market.toString() === marketPda.toString(),
+          (item: PositionData) =>
+            item.isOpen && item.market.toString() === marketAddress.toString(),
         )
         .sort((a: PositionData, b: PositionData) =>
           b.openedAt.sub(a.openedAt).toNumber(),
@@ -100,13 +100,28 @@ export function usePosition(marketSymbol: MarketSymbol = "SOL") {
   }, [connection, marketSymbol, publicKey]);
 
   useEffect(() => {
-    // Polling is simple for devnet and catches updates caused by close,
-    // liquidation, or future keeper execution.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchPosition();
-    const interval = setInterval(fetchPosition, 5000);
-    return () => clearInterval(interval);
-  }, [fetchPosition]);
+
+    if (!publicKey) return;
+    const marketAddress = getMarketPda(marketSymbol);
+    const ownerAndMarketFilters = [
+      { memcmp: { offset: 8, bytes: publicKey.toBase58() } },
+      { memcmp: { offset: 40, bytes: marketAddress.toBase58() } },
+    ];
+    const subscriptionId = connection.onProgramAccountChange(
+      PROGRAM_ID,
+      () => fetchPosition(),
+      "confirmed",
+      ownerAndMarketFilters,
+    );
+    const safetyTimer = setInterval(fetchPosition, 30_000);
+
+    return () => {
+      connection.removeProgramAccountChangeListener(subscriptionId);
+      clearInterval(safetyTimer);
+    };
+  }, [connection, marketSymbol, publicKey, fetchPosition]);
 
   const refetch = useCallback(() => {
     fetchPosition();

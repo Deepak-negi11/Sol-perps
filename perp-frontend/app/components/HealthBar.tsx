@@ -10,15 +10,13 @@ interface HealthBarProps {
 }
 
 export default function HealthBar({ remainingCollateral, requiredMargin }: HealthBarProps) {
-  const rem = lamportsToToken(remainingCollateral);
-  const req = lamportsToToken(requiredMargin);
-
+  const collateralUsd = lamportsToToken(remainingCollateral);
+  const requiredUsd = lamportsToToken(requiredMargin);
 
   let ratio = 0;
-  if (req > 0) {
-    ratio = rem / req;
+  if (requiredUsd > 0) {
+    ratio = collateralUsd / requiredUsd;
   }
-
 
   const safetyPercent = Math.max(0, Math.min(100, (ratio - 1) * 100));
 
@@ -61,8 +59,8 @@ export default function HealthBar({ remainingCollateral, requiredMargin }: Healt
       </div>
 
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.65rem", color: "var(--text-muted)", marginTop: 4 }}>
-        <span>Liquidation Limit: {req.toFixed(2)} USD</span>
-        <span>Collateral: {rem.toFixed(2)} USD</span>
+        <span>Liquidation Limit: {requiredUsd.toFixed(2)} USD</span>
+        <span>Collateral: {collateralUsd.toFixed(2)} USD</span>
       </div>
     </div>
   );

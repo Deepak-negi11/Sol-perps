@@ -18,8 +18,6 @@ export interface UserCollateralData {
 }
 
 export function useUserCollateral(_marketSymbol: MarketSymbol = "SOL") {
-  // User collateral is the wallet's deposit ledger inside the protocol. It is
-  // different from the SPL token account that actually holds wallet USDC.
   const { connection } = useConnection();
   const { publicKey } = useWallet();
   const [data, setData] = useState<UserCollateralData | null>(null);
@@ -32,9 +30,8 @@ export function useUserCollateral(_marketSymbol: MarketSymbol = "SOL") {
       return;
     }
     try {
-      // One shared USDC margin PDA backs positions across every market.
-      const pda = getUserCollateralPda(publicKey);
-      const dummyWallet = {
+      const collateralAddress = getUserCollateralPda(publicKey);
+      const readonlyWallet = {
         publicKey: PublicKey.default,
         signTransaction: async <T extends Transaction | VersionedTransaction>(
           tx: T,
@@ -45,12 +42,12 @@ export function useUserCollateral(_marketSymbol: MarketSymbol = "SOL") {
           txs: T[],
         ) => txs,
       };
-      const provider = new AnchorProvider(connection, dummyWallet, { commitment: "confirmed" });
+      const provider = new AnchorProvider(connection, readonlyWallet, { commitment: "confirmed" });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const program = new Program(idl as any, provider);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const account = await (program.account as any).userCollateral.fetch(pda);
-      setData(account as UserCollateralData);
+      const collateralAccount = await (program.account as any).userCollateral.fetch(collateralAddress);
+      setData(collateralAccount as UserCollateralData);
     } catch {
       setData(null);
     } finally {
@@ -59,13 +56,19 @@ export function useUserCollateral(_marketSymbol: MarketSymbol = "SOL") {
   }, [connection, publicKey]);
 
   useEffect(() => {
-    // Poll because deposits, withdrawals, opens, closes, and trigger orders can
-    // all change the locked or deposited amounts.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchData();
-    const interval = setInterval(fetchData, 5000);
-    return () => clearInterval(interval);
-  }, [fetchData]);
+
+    if (!publicKey) return;
+    const collateralAddress = getUserCollateralPda(publicKey);
+    const subscriptionId = connection.onAccountChange(collateralAddress, () => fetchData(), "confirmed");
+    const safetyTimer = setInterval(fetchData, 30_000);
+
+    return () => {
+      connection.removeAccountChangeListener(subscriptionId);
+      clearInterval(safetyTimer);
+    };
+  }, [connection, publicKey, fetchData]);
 
   const refetch = useCallback(() => {
     fetchData();
@@ -74,8 +77,6 @@ export function useUserCollateral(_marketSymbol: MarketSymbol = "SOL") {
     setTimeout(fetchData, 5000);
   }, [fetchData]);
 
-  // Available collateral is the free balance the user can withdraw or use for a
-  // new order. Locked collateral backs open positions or pending trigger orders.
   const availableAmount = data
     ? data.depositedAmount.sub(data.lockedAmount)
     : new BN(0);

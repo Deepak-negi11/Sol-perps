@@ -19,6 +19,7 @@ import type { PublicKey } from "@solana/web3.js";
 import { useUserCollateral } from "@/hooks/useUserCollateral";
 import type { MarketSymbol } from "@/lib/constants";
 import { useTradeHistory } from "@/hooks/useTradeHistory";
+import LiveTrades from "./LiveTrades";
 
 interface PositionsDockProps {
   market: MarketData | null;
@@ -26,15 +27,13 @@ interface PositionsDockProps {
   onUpdate: () => void;
 }
 
-type TabType = "positions" | "balances" | "history";
+type TabType = "positions" | "balances" | "history" | "trades";
 
 export default function PositionsDock({
   market,
   marketSymbol,
   onUpdate,
 }: PositionsDockProps) {
-  // This dock combines live positions, shared collateral, and RPC-parsed
-  // on-chain trade events for the selected market.
   const { connection } = useConnection();
   const { publicKey } = useWallet();
   const wallet = useAnchorWallet();
@@ -53,10 +52,7 @@ export default function PositionsDock({
   } = useTradeHistory();
   const [activeTab, setActiveTab] = useState<TabType>("positions");
   const [closing, setClosing] = useState(false);
-  const effectiveTab = activeTab;
 
-  // Compute display PnL from the current Pyth price and on-chain positions.
-  // The close instruction still asks the contract to calculate the final PnL.
   const computedPositions = useMemo(() => {
     if (!positions.length || !priceData) return [];
 
@@ -91,8 +87,6 @@ export default function PositionsDock({
       const pnlUsd = lamportsToToken(signedPnl);
       const pnlPercent = (pnlUsd / (collateralUsd || 1)) * 100;
 
-      // Est. liquidation price for display. It mirrors the ticket preview and is
-      // not a substitute for the contract's health checks.
       const activeLeverage = position.leverage.toNumber();
       const maintenanceMargin = market
         ? market.liquidationThresholdBps.toNumber() / 10_000
@@ -120,8 +114,6 @@ export default function PositionsDock({
     });
   }, [market, positions, priceData]);
 
-  // closePosition realizes PnL, unlocks collateral, and clears the user's
-  // position account according to the contract instruction.
   const handleClose = async (positionPublicKey: PublicKey) => {
     if (!program || !market || !publicKey || !wallet) return;
     setClosing(true);
@@ -130,7 +122,7 @@ export default function PositionsDock({
         "Wallet approval covers Pyth price update, close execution, and cleanup.",
         "info",
       );
-      const [sig] = await sendWithFreshPythPrice({
+      const [signature] = await sendWithFreshPythPrice({
         connection,
         wallet,
         feedId: market.priceFeedId,
@@ -149,7 +141,7 @@ export default function PositionsDock({
           },
         ],
       });
-      addToast("Position closed successfully", "success", sig);
+      addToast("Position closed successfully", "success", signature);
       await refetch();
       await refetchHistory();
       onUpdate();
@@ -167,19 +159,19 @@ export default function PositionsDock({
     <section className="positions-dock" aria-label="Terminal Dock">
       <div className="dock-tabs">
         <button
-          className={effectiveTab === "positions" ? "active" : ""}
+          className={activeTab === "positions" ? "active" : ""}
           onClick={() => setActiveTab("positions")}
         >
           Positions
         </button>
         <button
-          className={effectiveTab === "balances" ? "active" : ""}
+          className={activeTab === "balances" ? "active" : ""}
           onClick={() => setActiveTab("balances")}
         >
           Balances
         </button>
         <button
-          className={effectiveTab === "history" ? "active" : ""}
+          className={activeTab === "history" ? "active" : ""}
           onClick={() => {
             setActiveTab("history");
             void refetchHistory();
@@ -187,11 +179,16 @@ export default function PositionsDock({
         >
           Trade History
         </button>
+        <button
+          className={activeTab === "trades" ? "active" : ""}
+          onClick={() => setActiveTab("trades")}
+        >
+          Live Trades
+        </button>
       </div>
 
       <div className="dock-content">
-        {/* Positions tab: shows the single open position PDA for the wallet. */}
-        {effectiveTab === "positions" && (
+        {activeTab === "positions" && (
           <div className="dock-tab-pane">
             {!publicKey ? (
               <div className="dock-empty">
@@ -303,8 +300,7 @@ export default function PositionsDock({
           </div>
         )}
 
-        {/* Balances tab: shows a table of the user's collateral ledger. */}
-        {effectiveTab === "balances" && (
+        {activeTab === "balances" && (
           <div className="dock-tab-pane">
             {!publicKey ? (
               <div className="dock-empty">
@@ -353,7 +349,7 @@ export default function PositionsDock({
           </div>
         )}
 
-        {effectiveTab === "history" && (
+        {activeTab === "history" && (
           <div className="dock-tab-pane">
             {!publicKey ? (
               <div className="dock-empty">
@@ -443,6 +439,12 @@ export default function PositionsDock({
                 No trades found for this wallet
               </div>
             )}
+          </div>
+        )}
+
+        {activeTab === "trades" && (
+          <div className="dock-tab-pane">
+            <LiveTrades market={marketSymbol} />
           </div>
         )}
       </div>

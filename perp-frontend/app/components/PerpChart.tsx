@@ -36,24 +36,9 @@ const TIMEFRAME_CONFIG: Record<
     binanceInterval: string;
   }
 > = {
-  "5m": {
-    candles: 120,
-    seconds: 5 * 60,
-    volatility: 0.008,
-    binanceInterval: "5m",
-  },
-  "15m": {
-    candles: 120,
-    seconds: 15 * 60,
-    volatility: 0.014,
-    binanceInterval: "15m",
-  },
-  "1h": {
-    candles: 120,
-    seconds: 60 * 60,
-    volatility: 0.028,
-    binanceInterval: "1h",
-  },
+  "5m": { candles: 120, seconds: 5 * 60, volatility: 0.008, binanceInterval: "5m" },
+  "15m": { candles: 120, seconds: 15 * 60, volatility: 0.014, binanceInterval: "15m" },
+  "1h": { candles: 120, seconds: 60 * 60, volatility: 0.028, binanceInterval: "1h" },
 };
 
 const BINANCE_SYMBOLS: Record<TerminalMarket, string> = {
@@ -67,8 +52,6 @@ export default function PerpChart({
   timeframe,
   market,
 }: PerpChartProps) {
-  // lightweight-charts is imperative, so refs hold the chart instance and series
-  // while React state holds only the candle data source.
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
@@ -81,18 +64,16 @@ export default function PerpChart({
     volume: HistogramData<UTCTimestamp>[];
   } | null>(null);
 
-  // Synthetic candles are a safety net for local/devnet work when Binance is
-  // unavailable. They keep the chart usable without pretending to be chain data.
   const fallbackData = useMemo(() => {
     const safePrice = Number.isFinite(price) && price > 0 ? price : 75;
-    const config = TIMEFRAME_CONFIG[timeframe];
-    const start = CHART_END_TIME - config.candles * config.seconds;
-    const midpoint = config.candles / 2;
-    const candleData = Array.from({ length: config.candles }, (_, i) => {
+    const timeframeConfig = TIMEFRAME_CONFIG[timeframe];
+    const start = CHART_END_TIME - timeframeConfig.candles * timeframeConfig.seconds;
+    const midpoint = timeframeConfig.candles / 2;
+    const candleData = Array.from({ length: timeframeConfig.candles }, (_, i) => {
       const wave =
-        Math.sin(i / 5) * config.volatility +
-        Math.cos(i / 11) * config.volatility * 0.75;
-      const drift = (i - midpoint) * config.volatility * 0.055;
+        Math.sin(i / 5) * timeframeConfig.volatility +
+        Math.cos(i / 11) * timeframeConfig.volatility * 0.75;
+      const drift = (i - midpoint) * timeframeConfig.volatility * 0.055;
       const center = safePrice * (1 + wave + drift);
       const open = center * (1 + Math.sin(i * 1.7) * 0.0028);
       const close = center * (1 + Math.cos(i * 1.3) * 0.0032);
@@ -100,7 +81,7 @@ export default function PerpChart({
       const low = Math.min(open, close) * (1 - 0.002 - (i % 4) * 0.0005);
 
       return {
-        time: (start + i * config.seconds) as UTCTimestamp,
+        time: (start + i * timeframeConfig.seconds) as UTCTimestamp,
         open,
         high,
         low,
@@ -120,17 +101,15 @@ export default function PerpChart({
     return { candles: candleData, volume: volumeData };
   }, [price, timeframe]);
 
-  // Pull public spot candles for the selected preview market and timeframe.
-  // These candles are visual only; contract execution still depends on Pyth.
   useEffect(() => {
     const abort = new AbortController();
-    const config = TIMEFRAME_CONFIG[timeframe];
-    const symbol = BINANCE_SYMBOLS[market];
+    const timeframeConfig = TIMEFRAME_CONFIG[timeframe];
+    const binanceSymbol = BINANCE_SYMBOLS[market];
 
     async function fetchCandles() {
       try {
         const response = await fetch(
-          `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${config.binanceInterval}&limit=${config.candles}`,
+          `https://api.binance.com/api/v3/klines?symbol=${binanceSymbol}&interval=${timeframeConfig.binanceInterval}&limit=${timeframeConfig.candles}`,
           { signal: abort.signal },
         );
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -169,8 +148,6 @@ export default function PerpChart({
 
   const { candles, volume } = remoteCandles ?? fallbackData;
 
-  // Zooming works by editing the visible logical range, which avoids rebuilding
-  // the chart or changing the underlying candle data.
   const zoomChart = (factor: number) => {
     const chart = chartRef.current;
     if (!chart) return;
@@ -190,8 +167,6 @@ export default function PerpChart({
     chartRef.current?.timeScale().fitContent();
   };
 
-  // Create the chart once. Data updates happen in the next effect so user zoom
-  // and pan state are not lost on every price tick.
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -274,8 +249,6 @@ export default function PerpChart({
     };
   }, []);
 
-  // Push new candle/volume arrays into the existing series. When the market or
-  // timeframe changes, fit once so the new dataset starts in a sensible view.
   useEffect(() => {
     if (
       !chartRef.current ||
