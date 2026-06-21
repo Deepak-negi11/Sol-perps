@@ -1,0 +1,130 @@
+/* ===== SHEAR polish: wallet CTA, left drawing rail, micro-interactions ===== */
+
+/* --- Connect-wallet CTA: solid crimson, no pink/purple gradient --- */
+.connect-state .wallet-adapter-button,
+.connect-state .wallet-adapter-button.wallet-btn {
+  width: 100%;
+  height: 42px !important;
+  background: var(--accent-blue) !important;
+  background-image: none !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 10px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.01em;
+  transition: filter 0.15s ease, transform 0.1s ease, box-shadow 0.2s ease !important;
+}
+
+.connect-state .wallet-adapter-button:hover {
+  filter: brightness(1.12) !important;
+  box-shadow: 0 0 0 1px rgba(225, 29, 72, 0.4),
+    0 8px 24px rgba(225, 29, 72, 0.25) !important;
+}
+
+.connect-state .wallet-adapter-button:active {
+  transform: translateY(1px) !important;
+}
+
+/* --- Drawing tools as a left vertical rail (SHEAR-style) --- */
+.terminal-chart-stage {
+  position: relative;
+}
+
+.chart-tool-strip .drawing-tools {
+  position: absolute;
+  left: 8px;
+  top: 54px;
+  z-index: 6;
+  flex-direction: column;
+  gap: 4px;
+  padding: 5px;
+  background: rgba(8, 9, 12, 0.82);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  backdrop-filter: blur(8px);
+}
+
+.chart-tool-strip .drawing-tools button {
+  width: 30px;
+  height: 30px;
+  justify-content: center;
+  padding: 0;
+  border-radius: 8px;
+}
+
+.chart-tool-strip .drawing-tools button span {
+  display: none;
+}
+
+/* --- Micro-interactions --- */
+.ticket-submit,
+.setup-submit,
+.admin-save-btn,
+.admin-action-btn,
+.balance-chip,
+.deposit-btn-header,
+.close-pos-btn,
+.trigger-order-submit,
+.btn {
+  transition: filter 0.15s ease, transform 0.1s ease, box-shadow 0.2s ease,
+    background 0.15s ease, border-color 0.15s ease;
+}
+
+.ticket-submit:hover:not(:disabled),
+.setup-submit:hover:not(:disabled),
+.admin-save-btn:hover:not(:disabled),
+.btn:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.ticket-submit:active:not(:disabled),
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.terminal-nav button,
+.side-switch button,
+.mode-switch button,
+.dock-tabs button,
+.timeframe-row button,
+.chart-tool-strip button,
+.market-select {
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease,
+    transform 0.08s ease;
+}
+
+.market-stat-grid div,
+.glass-card,
+.terminal-panel,
+.ticket-card {
+  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.market-stat-grid div:hover {
+  border-color: var(--border-active);
+}
+
+.close-pos-btn:hover,
+.admin-action-btn:hover {
+  filter: brightness(1.12);
+}
+
+@keyframes shear-pulse-dot {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.network-chip svg {
+  animation: shear-pulse-dot 2s ease-in-out infinite;
+}
+
+.history-tx-link {
+  transition: color 0.15s ease, background 0.15s ease;
+}

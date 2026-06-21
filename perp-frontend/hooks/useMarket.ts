@@ -13,6 +13,7 @@ export interface MarketData {
   admin: PublicKey;
   maxLeverage: BN;
   priceFeedId: number[];
+  quoteFeedId: number[];
   collateralMint: PublicKey;
   liquidationThresholdBps: BN;
   tradingFeesBps: BN;
@@ -25,7 +26,7 @@ export interface MarketData {
   bump: number;
 }
 
-export function useMarket(marketSymbol: MarketSymbol = "SOL") {
+export function useMarket(marketSymbol: MarketSymbol = "SOLHYPE") {
   const { connection } = useConnection();
   const [market, setMarket] = useState<MarketData | null>(null);
   const [loading, setLoading] = useState(true);

@@ -130,11 +130,11 @@ export function useTradeHistory() {
       }
 
       const eventParser = new EventParser(PROGRAM_ID, new BorshCoder(idl as Idl));
-      const marketSymbols: MarketSymbol[] = ["SOL", "ETH", "WBTC"];
+      const marketSymbols: MarketSymbol[] = ["SOLHYPE"];
       const symbolByMarketAddress = new Map(
         marketSymbols.map((symbol) => [getMarketPda(symbol).toString(), symbol]),
       );
-      symbolByMarketAddress.set(LEGACY_MARKET_PDA.toString(), "SOL");
+      symbolByMarketAddress.set(LEGACY_MARKET_PDA.toString(), "SOLHYPE");
       const historyItems: TradeHistoryItem[] = [];
 
       transactions.forEach(({ signature, transaction }) => {

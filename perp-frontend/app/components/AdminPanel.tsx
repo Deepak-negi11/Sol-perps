@@ -8,7 +8,8 @@ import { useToast } from "./Toast";
 import { getMarketPda, getVaultAuthorityPda } from "@/lib/pda";
 import {
   DEVNET_COLLATERAL_MINT,
-  MARKET_FEED_IDS,
+  MARKET_BASE_FEED_IDS,
+  MARKET_QUOTE_FEED_IDS,
   type MarketSymbol,
 } from "@/lib/constants";
 import { PublicKey } from "@solana/web3.js";
@@ -43,9 +44,10 @@ export default function AdminPanel({
   const [updatingLiquidity, setUpdatingLiquidity] = useState(false);
 
   const [initMint, setInitMint] = useState(DEVNET_COLLATERAL_MINT);
-  const [initFeed, setInitFeed] = useState(MARKET_FEED_IDS[marketSymbol]);
+  const [initBaseFeed, setInitBaseFeed] = useState(MARKET_BASE_FEED_IDS[marketSymbol]);
+  const [initQuoteFeed, setInitQuoteFeed] = useState(MARKET_QUOTE_FEED_IDS[marketSymbol]);
   const [initMaxLeverage, setInitMaxLeverage] = useState("100");
-  const [initLiqBps, setInitLiqBps] = useState("500");
+  const [initLiqBps, setInitLiqBps] = useState("50");
   const [initFeeBps, setInitFeeBps] = useState("10");
 
   const [maxLeverage, setMaxLeverage] = useState("");
@@ -57,7 +59,9 @@ export default function AdminPanel({
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setInitFeed(MARKET_FEED_IDS[marketSymbol]);
+    setInitBaseFeed(MARKET_BASE_FEED_IDS[marketSymbol]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setInitQuoteFeed(MARKET_QUOTE_FEED_IDS[marketSymbol]);
   }, [marketSymbol]);
 
   if (loading) return null;
@@ -71,14 +75,16 @@ export default function AdminPanel({
     try {
       addToast("Initializing market...", "info");
       const mintPubkey = new PublicKey(initMint);
-      const feedBytes = Array.from(Buffer.from(initFeed, "hex"));
+      const baseFeedBytes = Array.from(Buffer.from(initBaseFeed, "hex"));
+      const quoteFeedBytes = Array.from(Buffer.from(initQuoteFeed, "hex"));
 
       const signature = await program.methods
         .initializeMarket(
           new BN(initMaxLeverage),
           new BN(initLiqBps),
           new BN(initFeeBps),
-          feedBytes,
+          baseFeedBytes,
+          quoteFeedBytes,
         )
         .accounts({
           market: getMarketPda(marketSymbol),
@@ -291,11 +297,19 @@ export default function AdminPanel({
             />
           </label>
           <label className="setup-field wide">
-            <span>Pyth {marketSymbol === "WBTC" ? "BTC" : marketSymbol}/USD feed</span>
+            <span>Base feed (SOL/USD)</span>
             <input
               type="text"
-              value={initFeed}
-              onChange={(e) => setInitFeed(e.target.value)}
+              value={initBaseFeed}
+              onChange={(e) => setInitBaseFeed(e.target.value)}
+            />
+          </label>
+          <label className="setup-field wide">
+            <span>Quote feed (HYPE/USD)</span>
+            <input
+              type="text"
+              value={initQuoteFeed}
+              onChange={(e) => setInitQuoteFeed(e.target.value)}
             />
           </label>
           <label className="setup-field">

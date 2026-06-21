@@ -1,20 +1,23 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Maximize2, ZoomIn, ZoomOut } from "lucide-react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Maximize2, Minus, MoveDiagonal, PencilLine, Ruler, Trash2, TrendingUp, ZoomIn, ZoomOut } from "lucide-react";
 import {
-  CandlestickSeries,
-  ColorType,
-  CrosshairMode,
-  HistogramSeries,
-  createChart,
-  type CandlestickData,
-  type HistogramData,
-  type IChartApi,
-  type ISeriesApi,
-  type LogicalRange,
-  type UTCTimestamp,
-} from "lightweight-charts";
+  CandleType,
+  LineType,
+  PolygonType,
+  TooltipShowRule,
+  TooltipShowType,
+  YAxisPosition,
+  YAxisType,
+  dispose,
+  init,
+  type Chart,
+  type DeepPartial,
+  type KLineData,
+  type Styles,
+} from "klinecharts";
+import { MARKET_BASE_FEED_IDS, MARKET_QUOTE_FEED_IDS } from "@/lib/constants";
 import { type TerminalMarket } from "./MarketRail";
 
 interface PerpChartProps {
@@ -23,270 +26,582 @@ interface PerpChartProps {
   market: TerminalMarket;
 }
 
-const CHART_END_TIME = 1780502400;
-
 export type ChartTimeframe = "5m" | "15m" | "1h";
 
-const TIMEFRAME_CONFIG: Record<
-  ChartTimeframe,
-  {
-    candles: number;
-    seconds: number;
-    volatility: number;
-    binanceInterval: string;
-  }
-> = {
-  "5m": { candles: 120, seconds: 5 * 60, volatility: 0.008, binanceInterval: "5m" },
-  "15m": { candles: 120, seconds: 15 * 60, volatility: 0.014, binanceInterval: "15m" },
-  "1h": { candles: 120, seconds: 60 * 60, volatility: 0.028, binanceInterval: "1h" },
+const RES_PARAM: Record<ChartTimeframe, string> = {
+  "5m": "5",
+  "15m": "15",
+  "1h": "60",
 };
 
-const BINANCE_SYMBOLS: Record<TerminalMarket, string> = {
-  SOL: "SOLUSDC",
-  ETH: "ETHUSDC",
-  WBTC: "BTCUSDC",
+const RES_SECONDS: Record<ChartTimeframe, number> = {
+  "5m": 300,
+  "15m": 900,
+  "1h": 3600,
 };
 
-export default function PerpChart({
-  price,
-  timeframe,
-  market,
-}: PerpChartProps) {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const chartRef = useRef<IChartApi | null>(null);
-  const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
-  const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
-  const didFitContentRef = useRef(false);
-  const lastTimeframeRef = useRef<ChartTimeframe>(timeframe);
-  const lastMarketRef = useRef<TerminalMarket>(market);
-  const [remoteCandles, setRemoteCandles] = useState<{
-    candles: CandlestickData<UTCTimestamp>[];
-    volume: HistogramData<UTCTimestamp>[];
-  } | null>(null);
+const HISTORY_BARS = 400;
+const FALLBACK_RATIO_PRICE = 0.04166;
+const PYTH_BENCH =
+  "https://benchmarks.pyth.network/v1/shims/tradingview/history";
 
-  const fallbackData = useMemo(() => {
-    const safePrice = Number.isFinite(price) && price > 0 ? price : 75;
-    const timeframeConfig = TIMEFRAME_CONFIG[timeframe];
-    const start = CHART_END_TIME - timeframeConfig.candles * timeframeConfig.seconds;
-    const midpoint = timeframeConfig.candles / 2;
-    const candleData = Array.from({ length: timeframeConfig.candles }, (_, i) => {
-      const wave =
-        Math.sin(i / 5) * timeframeConfig.volatility +
-        Math.cos(i / 11) * timeframeConfig.volatility * 0.75;
-      const drift = (i - midpoint) * timeframeConfig.volatility * 0.055;
-      const center = safePrice * (1 + wave + drift);
-      const open = center * (1 + Math.sin(i * 1.7) * 0.0028);
-      const close = center * (1 + Math.cos(i * 1.3) * 0.0032);
-      const high = Math.max(open, close) * (1 + 0.002 + (i % 5) * 0.00055);
-      const low = Math.min(open, close) * (1 - 0.002 - (i % 4) * 0.0005);
+const FEED_ID_TO_SYMBOL: Record<string, string> = {
+  [MARKET_BASE_FEED_IDS.SOLHYPE]: "Crypto.SOL/USD",
+  [MARKET_QUOTE_FEED_IDS.SOLHYPE]: "Crypto.HYPE/USD",
+};
 
-      return {
-        time: (start + i * timeframeConfig.seconds) as UTCTimestamp,
-        open,
-        high,
-        low,
-        close,
-      };
+const INDICATORS = ["MA", "EMA", "BOLL", "VOL", "MACD"] as const;
+const DRAWING_TOOLS = [
+  { label: "Trend", name: "segment", icon: PencilLine },
+  { label: "Ray", name: "rayLine", icon: TrendingUp },
+  { label: "H-Line", name: "horizontalStraightLine", icon: Minus },
+  { label: "Price", name: "priceLine", icon: Ruler },
+] as const;
+
+interface Bars {
+  t: number[];
+  o: number[];
+  h: number[];
+  l: number[];
+  c: number[];
+  v?: number[];
+}
+
+async function fetchFeedHistory(
+  symbol: string,
+  resolution: string,
+  from: number,
+  to: number,
+  signal: AbortSignal,
+): Promise<Bars> {
+  const url = `${PYTH_BENCH}?symbol=${encodeURIComponent(symbol)}&resolution=${resolution}&from=${from}&to=${to}`;
+  const res = await fetch(url, { signal });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const json = (await res.json()) as Bars & { s?: string };
+  if (json.s !== "ok") throw new Error(`Pyth history status: ${json.s}`);
+  return json;
+}
+
+function buildRatioCandles(base: Bars, quote: Bars): KLineData[] {
+  const quoteByTime = new Map<
+    number,
+    { o: number; h: number; l: number; c: number; v: number }
+  >();
+
+  for (let i = 0; i < quote.t.length; i += 1) {
+    quoteByTime.set(quote.t[i], {
+      o: quote.o[i],
+      h: quote.h[i],
+      l: quote.l[i],
+      c: quote.c[i],
+      v: quote.v?.[i] ?? 0,
     });
+  }
 
-    const volumeData = candleData.map((item, i) => ({
-      time: item.time,
-      value: Math.round(180 + Math.abs(Math.sin(i / 4)) * 260 + (i % 7) * 36),
-      color:
-        item.close >= item.open
-          ? "rgba(0, 184, 166, 0.32)"
-          : "rgba(255, 48, 70, 0.32)",
-    }));
+  const out: KLineData[] = [];
+  for (let i = 0; i < base.t.length; i += 1) {
+    const q = quoteByTime.get(base.t[i]);
+    if (!q || q.o <= 0 || q.h <= 0 || q.l <= 0 || q.c <= 0) continue;
 
-    return { candles: candleData, volume: volumeData };
-  }, [price, timeframe]);
+    const open = base.o[i] / q.o;
+    const close = base.c[i] / q.c;
+    const high = Math.max(base.h[i] / q.l, open, close);
+    const low = Math.min(base.l[i] / q.h, open, close);
 
-  useEffect(() => {
-    const abort = new AbortController();
-    const timeframeConfig = TIMEFRAME_CONFIG[timeframe];
-    const binanceSymbol = BINANCE_SYMBOLS[market];
+    out.push({
+      timestamp: base.t[i] * 1000,
+      open,
+      high,
+      low,
+      close,
+      volume: Math.max(base.v?.[i] ?? 0, q.v, Math.abs(close - open)),
+    });
+  }
 
-    async function fetchCandles() {
-      try {
-        const response = await fetch(
-          `https://api.binance.com/api/v3/klines?symbol=${binanceSymbol}&interval=${timeframeConfig.binanceInterval}&limit=${timeframeConfig.candles}`,
-          { signal: abort.signal },
-        );
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const rows = (await response.json()) as unknown[][];
-        const candles: CandlestickData<UTCTimestamp>[] = rows.map((row) => ({
-          time: Math.floor(Number(row[0]) / 1000) as UTCTimestamp,
-          open: Number(row[1]),
-          high: Number(row[2]),
-          low: Number(row[3]),
-          close: Number(row[4]),
-        }));
-        const volume: HistogramData<UTCTimestamp>[] = rows.map((row) => {
-          const open = Number(row[1]);
-          const close = Number(row[4]);
-          return {
-            time: Math.floor(Number(row[0]) / 1000) as UTCTimestamp,
-            value: Number(row[5]),
-            color:
-              close >= open
-                ? "rgba(0, 184, 166, 0.32)"
-                : "rgba(255, 48, 70, 0.32)",
-          };
-        });
-        setRemoteCandles({ candles, volume });
-      } catch (error) {
-        if (!abort.signal.aborted) {
-          console.warn("Falling back to synthetic candles", error);
-          setRemoteCandles(null);
-        }
-      }
-    }
+  return out;
+}
 
-    fetchCandles();
-    return () => abort.abort();
-  }, [market, timeframe]);
+function buildFallbackCandles(
+  timeframe: ChartTimeframe,
+  seedPrice: number,
+): KLineData[] {
+  const seconds = RES_SECONDS[timeframe];
+  const count = 180;
+  const safePrice =
+    Number.isFinite(seedPrice) && seedPrice > 0 ? seedPrice : FALLBACK_RATIO_PRICE;
+  const nowBucket = Math.floor(Date.now() / 1000 / seconds) * seconds;
+  const start = nowBucket - count * seconds;
 
-  const { candles, volume } = remoteCandles ?? fallbackData;
+  return Array.from({ length: count }, (_, index) => {
+    const wave = Math.sin(index / 9) * 0.0105 + Math.cos(index / 17) * 0.0065;
+    const breakout = index > count * 0.55 ? (index - count * 0.55) * 0.00012 : 0;
+    const center = safePrice * (1 + wave + breakout);
+    const open = center * (1 + Math.sin(index * 1.6) * 0.003);
+    const close = center * (1 + Math.cos(index * 1.2) * 0.0034);
+    const high = Math.max(open, close) * (1 + 0.0028 + (index % 5) * 0.0004);
+    const low = Math.min(open, close) * (1 - 0.0028 - (index % 4) * 0.0004);
 
-  const zoomChart = (factor: number) => {
-    const chart = chartRef.current;
-    if (!chart) return;
+    return {
+      timestamp: (start + index * seconds) * 1000,
+      open,
+      high,
+      low,
+      close,
+      volume: 8 + Math.abs(Math.sin(index / 3)) * 26 + (index % 7) * 3,
+    };
+  });
+}
 
-    const range = chart.timeScale().getVisibleLogicalRange();
-    if (!range) return;
+function applyCandles(chart: Chart | null, candles: KLineData[]) {
+  if (!chart) return;
+  chart.applyNewData(candles, false);
+  window.requestAnimationFrame(() => {
+    chart.resize();
+    chart.setOffsetRightDistance(24);
+    chart.scrollToDataIndex(candles.length - 1, 0);
+  });
+}
 
-    const center = (range.from + range.to) / 2;
-    const width = Math.max(8, (range.to - range.from) * factor);
-    chart.timeScale().setVisibleLogicalRange({
-      from: center - width / 2,
-      to: center + width / 2,
-    } as LogicalRange);
-  };
+const chartStyles: DeepPartial<Styles> = {
+  grid: {
+    horizontal: {
+      show: true,
+      color: "rgba(255,255,255,0.055)",
+      style: LineType.Solid,
+      size: 1,
+    },
+    vertical: {
+      show: true,
+      color: "rgba(255,255,255,0.045)",
+      style: LineType.Solid,
+      size: 1,
+    },
+  },
+  candle: {
+    type: CandleType.CandleSolid,
+    bar: {
+      upColor: "#22c55e",
+      downColor: "#ef4444",
+      noChangeColor: "#9aa0aa",
+      upBorderColor: "#22c55e",
+      downBorderColor: "#ef4444",
+      noChangeBorderColor: "#9aa0aa",
+      upWickColor: "#22c55e",
+      downWickColor: "#ef4444",
+      noChangeWickColor: "#9aa0aa",
+    },
+    priceMark: {
+      high: { color: "#d9dde5", textFamily: "inherit", textSize: 11 },
+      low: { color: "#d9dde5", textFamily: "inherit", textSize: 11 },
+      last: {
+        upColor: "#22c55e",
+        downColor: "#ef4444",
+        noChangeColor: "#e11d48",
+        line: {
+          show: true,
+          style: LineType.Dashed,
+          size: 1,
+          dashedValue: [4, 4],
+        },
+        text: {
+          show: true,
+          color: "#fff",
+          size: 12,
+          family: "inherit",
+          weight: 800,
+          paddingLeft: 6,
+          paddingTop: 3,
+          paddingRight: 6,
+          paddingBottom: 3,
+        },
+      },
+    },
+    tooltip: {
+      showRule: TooltipShowRule.FollowCross,
+      showType: TooltipShowType.Standard,
+      defaultValue: "-",
+      text: {
+        color: "#f4f5f7",
+        size: 12,
+        family: "inherit",
+        weight: 700,
+        marginLeft: 8,
+        marginTop: 6,
+        marginRight: 8,
+        marginBottom: 6,
+      },
+    },
+  },
+  indicator: {
+    ohlc: {
+      upColor: "#22c55e",
+      downColor: "#ef4444",
+      noChangeColor: "#9aa0aa",
+    },
+    lines: [
+      { color: "#f59e0b", size: 1, style: LineType.Solid, dashedValue: [], smooth: true },
+      { color: "#38bdf8", size: 1, style: LineType.Solid, dashedValue: [], smooth: true },
+      { color: "#e11d48", size: 1, style: LineType.Solid, dashedValue: [], smooth: true },
+      { color: "#a855f7", size: 1, style: LineType.Solid, dashedValue: [], smooth: true },
+    ],
+    tooltip: {
+      showRule: TooltipShowRule.FollowCross,
+      showType: TooltipShowType.Standard,
+      showName: true,
+      showParams: true,
+      defaultValue: "-",
+      text: {
+        color: "#cbd5e1",
+        size: 11,
+        family: "inherit",
+        weight: 650,
+        marginLeft: 8,
+        marginTop: 4,
+        marginRight: 8,
+        marginBottom: 4,
+      },
+    },
+  },
+  xAxis: {
+    show: true,
+    axisLine: { show: true, color: "rgba(255,255,255,0.08)", size: 1 },
+    tickLine: { show: false, color: "transparent", size: 1, length: 0 },
+    tickText: {
+      show: true,
+      color: "#777f8d",
+      family: "inherit",
+      weight: 700,
+      size: 11,
+      marginStart: 6,
+      marginEnd: 6,
+    },
+  },
+  yAxis: {
+    show: true,
+    type: YAxisType.Normal,
+    position: YAxisPosition.Right,
+    inside: false,
+    reverse: false,
+    axisLine: { show: true, color: "rgba(255,255,255,0.08)", size: 1 },
+    tickLine: { show: false, color: "transparent", size: 1, length: 0 },
+    tickText: {
+      show: true,
+      color: "#9aa0aa",
+      family: "inherit",
+      weight: 750,
+      size: 12,
+      marginStart: 6,
+      marginEnd: 6,
+    },
+  },
+  separator: {
+    size: 1,
+    color: "rgba(255,255,255,0.07)",
+    fill: true,
+    activeBackgroundColor: "rgba(225,29,72,0.14)",
+  },
+  crosshair: {
+    show: true,
+    horizontal: {
+      show: true,
+      line: {
+        show: true,
+        style: LineType.Dashed,
+        color: "rgba(244,245,247,0.58)",
+        size: 1,
+        dashedValue: [6, 6],
+      },
+      text: {
+        show: true,
+        style: PolygonType.Fill,
+        color: "#f4f5f7",
+        size: 12,
+        family: "inherit",
+        weight: 800,
+        backgroundColor: "#1a1c24",
+        borderColor: "rgba(255,255,255,0.12)",
+        borderSize: 1,
+        borderRadius: 3,
+        borderStyle: LineType.Solid,
+        borderDashedValue: [],
+        paddingLeft: 6,
+        paddingTop: 3,
+        paddingRight: 6,
+        paddingBottom: 3,
+      },
+    },
+    vertical: {
+      show: true,
+      line: {
+        show: true,
+        style: LineType.Dashed,
+        color: "rgba(244,245,247,0.45)",
+        size: 1,
+        dashedValue: [6, 6],
+      },
+      text: {
+        show: true,
+        style: PolygonType.Fill,
+        color: "#f4f5f7",
+        size: 12,
+        family: "inherit",
+        weight: 800,
+        backgroundColor: "#1a1c24",
+        borderColor: "rgba(255,255,255,0.12)",
+        borderSize: 1,
+        borderRadius: 3,
+        borderStyle: LineType.Solid,
+        borderDashedValue: [],
+        paddingLeft: 6,
+        paddingTop: 3,
+        paddingRight: 6,
+        paddingBottom: 3,
+      },
+    },
+  },
+  overlay: {
+    point: {
+      color: "#e11d48",
+      borderColor: "#fff",
+      borderSize: 1,
+      radius: 4,
+      activeColor: "#22c55e",
+      activeBorderColor: "#fff",
+      activeBorderSize: 1,
+      activeRadius: 5,
+    },
+    line: {
+      color: "#e11d48",
+      size: 1,
+      style: LineType.Solid,
+      dashedValue: [],
+      smooth: false,
+    },
+  },
+};
 
-  const resetZoom = () => {
-    chartRef.current?.timeScale().fitContent();
-  };
+export default function PerpChart({ price, timeframe, market }: PerpChartProps) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const chartRef = useRef<Chart | null>(null);
+  const candlesRef = useRef<KLineData[]>([]);
+  const loadedKeyRef = useRef("");
+  const [activeIndicators, setActiveIndicators] = useState<string[]>(["EMA", "VOL"]);
+  const [activeTool, setActiveTool] = useState<string | null>(null);
+  const [status, setStatus] = useState("Loading ratio candles…");
+
+  const marketKey = useMemo(() => `${market}-${timeframe}`, [market, timeframe]);
 
   useEffect(() => {
     if (!containerRef.current) return;
 
-    const chart = createChart(containerRef.current, {
-      autoSize: true,
-      handleScroll: {
-        mouseWheel: true,
-        pressedMouseMove: true,
-        horzTouchDrag: true,
-        vertTouchDrag: false,
-      },
-      handleScale: {
-        axisPressedMouseMove: true,
-        mouseWheel: true,
-        pinch: true,
-      },
-      layout: {
-        background: { type: ColorType.Solid, color: "#05080d" },
-        textColor: "#a7adb7",
-        panes: {
-          separatorColor: "#131922",
-          separatorHoverColor: "#29313d",
-        },
-      },
-      grid: {
-        vertLines: { color: "rgba(42, 50, 63, 0.45)" },
-        horzLines: { color: "rgba(42, 50, 63, 0.45)" },
-      },
-      rightPriceScale: {
-        borderColor: "#111720",
-        scaleMargins: { top: 0.08, bottom: 0.22 },
-      },
-      timeScale: {
-        borderColor: "#111720",
-        timeVisible: true,
-        secondsVisible: false,
-      },
-      crosshair: {
-        mode: CrosshairMode.Normal,
-        vertLine: {
-          color: "rgba(180, 187, 199, 0.68)",
-          labelBackgroundColor: "#3a3f4b",
-        },
-        horzLine: {
-          color: "rgba(180, 187, 199, 0.68)",
-          labelBackgroundColor: "#3a3f4b",
-        },
-      },
+    const chart = init(containerRef.current, {
+      timezone: "UTC",
+      styles: chartStyles,
     });
+    if (!chart) return;
 
-    const candleSeries = chart.addSeries(CandlestickSeries, {
-      upColor: "#00b8a6",
-      downColor: "#ff3046",
-      wickUpColor: "#00c7b4",
-      wickDownColor: "#ff3e54",
-      borderVisible: false,
-      priceLineColor: "#ff3046",
-    });
-
-    const volumeSeries = chart.addSeries(HistogramSeries, {
-      priceFormat: { type: "volume" },
-      priceScaleId: "",
-      lastValueVisible: false,
-      priceLineVisible: false,
-    });
-
+    chart.setPriceVolumePrecision(6, 4);
+    chart.setBarSpace(8);
+    chart.createIndicator("EMA", false, { id: "candle_pane" });
+    chart.createIndicator("VOL", false, { height: 96, dragEnabled: true });
     chartRef.current = chart;
-    candleSeriesRef.current = candleSeries;
-    volumeSeriesRef.current = volumeSeries;
-    volumeSeries.priceScale().applyOptions({
-      scaleMargins: { top: 0.78, bottom: 0 },
-    });
+
+    const resizeObserver = new ResizeObserver(() => chart.resize());
+    resizeObserver.observe(containerRef.current);
 
     return () => {
-      chart.remove();
+      resizeObserver.disconnect();
+      dispose(chart);
       chartRef.current = null;
-      candleSeriesRef.current = null;
-      volumeSeriesRef.current = null;
-      didFitContentRef.current = false;
+      candlesRef.current = [];
+      loadedKeyRef.current = "";
     };
   }, []);
 
   useEffect(() => {
-    if (
-      !chartRef.current ||
-      !candleSeriesRef.current ||
-      !volumeSeriesRef.current
-    ) {
+    const abort = new AbortController();
+    const resolution = RES_PARAM[timeframe];
+    const seconds = RES_SECONDS[timeframe];
+    const nowSec = Math.floor(Date.now() / 1000);
+    const from = nowSec - HISTORY_BARS * seconds;
+
+    const baseSymbol = FEED_ID_TO_SYMBOL[MARKET_BASE_FEED_IDS[market]];
+    const quoteSymbol = FEED_ID_TO_SYMBOL[MARKET_QUOTE_FEED_IDS[market]];
+
+    async function load() {
+      setStatus("Loading ratio candles…");
+      try {
+        const [base, quote] = await Promise.all([
+          fetchFeedHistory(baseSymbol, resolution, from, nowSec, abort.signal),
+          fetchFeedHistory(quoteSymbol, resolution, from, nowSec, abort.signal),
+        ]);
+        if (abort.signal.aborted) return;
+
+        const candles = buildRatioCandles(base, quote);
+        if (!candles.length) {
+          const fallbackCandles = buildFallbackCandles(timeframe, price);
+          candlesRef.current = fallbackCandles;
+          loadedKeyRef.current = marketKey;
+          applyCandles(chartRef.current, fallbackCandles);
+          setStatus("Preview candles while Pyth history is empty");
+          return;
+        }
+
+        candlesRef.current = candles;
+        loadedKeyRef.current = marketKey;
+        applyCandles(chartRef.current, candles);
+        setStatus(`${candles.length} real SOL/HYPE candles`);
+      } catch (error) {
+        if (!abort.signal.aborted) {
+          const fallbackCandles = buildFallbackCandles(timeframe, price);
+          candlesRef.current = fallbackCandles;
+          loadedKeyRef.current = marketKey;
+          applyCandles(chartRef.current, fallbackCandles);
+          setStatus("Preview candles while Pyth history loads");
+          console.warn("Failed to load ratio history from Pyth Benchmarks", error);
+        }
+      }
+    }
+
+    load();
+    return () => abort.abort();
+  }, [market, marketKey, price, timeframe]);
+
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart || !Number.isFinite(price) || price <= 0) return;
+    if (loadedKeyRef.current !== marketKey) return;
+
+    const seconds = RES_SECONDS[timeframe];
+    const bucket = Math.floor(Date.now() / 1000 / seconds) * seconds * 1000;
+    const candles = candlesRef.current;
+    const last = candles[candles.length - 1];
+    if (!last) return;
+
+    let next: KLineData;
+    if (last.timestamp === bucket) {
+      next = {
+        ...last,
+        high: Math.max(last.high, price),
+        low: Math.min(last.low, price),
+        close: price,
+        volume: Math.max(last.volume ?? 0, Math.abs(price - last.open)),
+      };
+      candles[candles.length - 1] = next;
+    } else if (bucket > last.timestamp) {
+      next = {
+        timestamp: bucket,
+        open: last.close,
+        high: Math.max(last.close, price),
+        low: Math.min(last.close, price),
+        close: price,
+        volume: Math.abs(price - last.close),
+      };
+      candles.push(next);
+    } else {
       return;
     }
 
-    if (
-      lastTimeframeRef.current !== timeframe ||
-      lastMarketRef.current !== market
-    ) {
-      didFitContentRef.current = false;
-      lastTimeframeRef.current = timeframe;
-      lastMarketRef.current = market;
-    }
+    chart.updateData(next);
+  }, [marketKey, price, timeframe]);
 
-    candleSeriesRef.current.setData(candles);
-    volumeSeriesRef.current.setData(volume);
+  const toggleIndicator = useCallback((indicator: string) => {
+    const chart = chartRef.current;
+    if (!chart) return;
 
-    if (!didFitContentRef.current) {
-      chartRef.current.timeScale().fitContent();
-      didFitContentRef.current = true;
-    }
-  }, [candles, market, timeframe, volume]);
+    setActiveIndicators((current) => {
+      const enabled = current.includes(indicator);
+      if (enabled) {
+        const panes = chart.getIndicatorByPaneId();
+        if (panes instanceof Map) {
+          panes.forEach((paneIndicators, paneId) => {
+            if (paneIndicators instanceof Map && paneIndicators.has(indicator)) {
+              chart.removeIndicator(paneId, indicator);
+            }
+          });
+        }
+        return current.filter((item) => item !== indicator);
+      }
+
+      const paneOptions =
+        indicator === "MA" || indicator === "EMA" || indicator === "BOLL"
+          ? { id: "candle_pane" }
+          : { height: indicator === "VOL" ? 96 : 120, dragEnabled: true };
+      chart.createIndicator(indicator, false, paneOptions);
+      return [...current, indicator];
+    });
+  }, []);
+
+  const createDrawing = useCallback((name: string) => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    chart.createOverlay(name);
+    setActiveTool(name);
+  }, []);
+
+  const zoomChart = useCallback((scale: number) => {
+    chartRef.current?.zoomAtCoordinate(scale, undefined, 120);
+  }, []);
+
+  const resetView = useCallback(() => {
+    chartRef.current?.scrollToRealTime(120);
+  }, []);
+
+  const clearDrawings = useCallback(() => {
+    chartRef.current?.removeOverlay();
+    setActiveTool(null);
+  }, []);
 
   return (
     <div className="terminal-chart-stage">
-      <div ref={containerRef} className="terminal-chart-canvas" />
+      <div className="chart-tool-strip" aria-label="Chart tools">
+        <div className="chart-tool-group indicator-tools">
+          {INDICATORS.map((indicator) => (
+            <button
+              className={activeIndicators.includes(indicator) ? "active" : ""}
+              key={indicator}
+              onClick={() => toggleIndicator(indicator)}
+              type="button"
+            >
+              {indicator}
+            </button>
+          ))}
+        </div>
+
+        <div className="chart-tool-group drawing-tools">
+          {DRAWING_TOOLS.map(({ icon: Icon, label, name }) => (
+            <button
+              className={activeTool === name ? "active" : ""}
+              key={name}
+              onClick={() => createDrawing(name)}
+              title={label}
+              type="button"
+            >
+              <Icon size={14} />
+              <span>{label}</span>
+            </button>
+          ))}
+          <button onClick={clearDrawings} title="Clear drawings" type="button">
+            <Trash2 size={14} />
+          </button>
+        </div>
+
+        <span className="chart-data-status">{status}</span>
+      </div>
+
+      <div ref={containerRef} className="terminal-chart-canvas kline-chart-canvas" />
+
       <div className="chart-zoom-controls" aria-label="Chart zoom controls">
-        <button aria-label="Zoom in chart" onClick={() => zoomChart(0.72)}>
+        <button aria-label="Zoom in chart" onClick={() => zoomChart(1.2)} type="button">
           <ZoomIn size={15} />
         </button>
-        <button aria-label="Zoom out chart" onClick={() => zoomChart(1.35)}>
+        <button aria-label="Zoom out chart" onClick={() => zoomChart(0.82)} type="button">
           <ZoomOut size={15} />
         </button>
-        <button aria-label="Reset chart zoom" onClick={resetZoom}>
+        <button aria-label="Return to latest candle" onClick={resetView} type="button">
+          <MoveDiagonal size={15} />
+        </button>
+        <button aria-label="Reset chart view" onClick={resetView} type="button">
           <Maximize2 size={15} />
         </button>
       </div>

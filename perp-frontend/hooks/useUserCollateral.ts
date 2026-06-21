@@ -17,7 +17,7 @@ export interface UserCollateralData {
   bump: number;
 }
 
-export function useUserCollateral(_marketSymbol: MarketSymbol = "SOL") {
+export function useUserCollateral(_marketSymbol: MarketSymbol = "SOLHYPE") {
   const { connection } = useConnection();
   const { publicKey } = useWallet();
   const [data, setData] = useState<UserCollateralData | null>(null);

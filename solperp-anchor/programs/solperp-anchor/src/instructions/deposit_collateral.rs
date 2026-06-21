@@ -13,7 +13,7 @@ use crate::state::{Market, UserCollateral};
 pub struct DepositCollateral<'info> {
     #[account(
         mut,
-        seeds = [MARKET_SEED, market.price_feed_id.as_ref()],
+        seeds = [MARKET_SEED, market.price_feed_id.as_ref(), market.quote_feed_id.as_ref()],
         bump = market.bump,
         constraint = market.collateral_mint == collateral_mint.key()
     )]

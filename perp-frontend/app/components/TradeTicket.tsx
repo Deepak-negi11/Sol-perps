@@ -19,6 +19,7 @@ import {
 import { useUserCollateral } from "@/hooks/useUserCollateral";
 import { usePosition } from "@/hooks/usePosition";
 import { sendWithFreshPythPrice } from "@/lib/pyth";
+import { MARKET_LABELS, type MarketSymbol } from "@/lib/constants";
 
 const WalletMultiButton = dynamic(
   async () =>
@@ -26,12 +27,12 @@ const WalletMultiButton = dynamic(
   { ssr: false },
 );
 
-const DEFAULT_MAX_LEVERAGE = 250;
+const DEFAULT_MAX_LEVERAGE = 100;
 const DEFAULT_TRADING_FEE_BPS = 10;
 
 interface TradeTicketProps {
   market: MarketData | null;
-  marketSymbol: "SOL" | "ETH" | "WBTC";
+  marketSymbol: MarketSymbol;
   price: number;
   marketLoading?: boolean;
   onUpdate: () => void;
@@ -65,25 +66,18 @@ export default function TradeTicket({
   const [sending, setSending] = useState(false);
 
   const available = lamportsToToken(availableAmount);
-  const maintenanceMaxLeverage = market
-    ? Math.max(
-        1,
-        Math.floor(9_999 / market.liquidationThresholdBps.toNumber()),
-      )
-    : DEFAULT_MAX_LEVERAGE;
   const maxLeverage = market
     ? Math.min(
-        DEFAULT_MAX_LEVERAGE,
-        maintenanceMaxLeverage,
-        Math.max(1, market.maxLeverage.toNumber()),
-      )
+      DEFAULT_MAX_LEVERAGE,
+      Math.max(1, market.maxLeverage.toNumber()),
+    )
     : DEFAULT_MAX_LEVERAGE;
   const activeLeverage = Math.min(leverage, maxLeverage);
   const feeBps = market
     ? market.tradingFeesBps.toNumber()
     : DEFAULT_TRADING_FEE_BPS;
   const parsedCollateral = Number.parseFloat(collateral) || 0;
-  const marketPair = `${marketSymbol}/USDC`;
+  const marketPair = MARKET_LABELS[marketSymbol];
   const nextOrderId = market?.nextOrderId?.toNumber() ?? 0;
 
   const summary = useMemo(() => {
@@ -117,8 +111,8 @@ export default function TradeTicket({
       const [signature] = await sendWithFreshPythPrice({
         connection,
         wallet,
-        feedId: market.priceFeedId,
-        buildInstructions: async (priceUpdateAccount) => [
+        feedIds: [market.priceFeedId, market.quoteFeedId],
+        buildInstructions: async ([priceUpdateAccount, quotePriceUpdateAccount]) => [
           {
             instruction: await program.methods
               .openPosition(
@@ -130,6 +124,7 @@ export default function TradeTicket({
               .accounts({
                 market: getMarketPda(marketSymbol),
                 priceUpdate: priceUpdateAccount,
+                quotePriceUpdate: quotePriceUpdateAccount,
                 userCollateral: getUserCollateralPda(publicKey, marketSymbol),
                 position: getPositionPda(publicKey, positionId, marketSymbol),
                 user: publicKey,
@@ -279,7 +274,12 @@ export default function TradeTicket({
     !sending;
 
   return (
-    <aside className="terminal-panel trade-ticket">
+    <section className="trade-ticket">
+      <div className="ticket-market-head">
+        <span>Market · {marketPair}</span>
+        <strong>{price > 0 ? price.toFixed(6) : "-"}</strong>
+      </div>
+
       {!publicKey ? (
         <div className="connect-state">
           <h2>Connect wallet</h2>
@@ -307,6 +307,10 @@ export default function TradeTicket({
           Sell / Short
         </button>
       </div>
+      <p className="ticket-side-note">
+        Profit if {marketPair.split("/")[0]} {side === "long" ? "outperforms" : "underperforms"}{" "}
+        {marketPair.split("/")[1]} regardless of market direction.
+      </p>
 
       <div className="mode-switch">
         <button
@@ -322,7 +326,7 @@ export default function TradeTicket({
           Limit
         </button>
         <span>
-          {marketPair} ${price.toFixed(2)}
+          {marketPair} {price.toFixed(4)}
         </span>
       </div>
 
@@ -403,14 +407,14 @@ export default function TradeTicket({
         {marketLoading
           ? "Loading market"
           : !market
-              ? "Market not initialized"
-              : available <= 0
-                ? "Deposit or import shared USDC first"
+            ? "Market not initialized"
+            : available <= 0
+              ? "Deposit or import shared USDC first"
               : market.isPaused
-                  ? "Market paused"
-                  : mode === "limit"
-                    ? `Place ${side === "long" ? "Long" : "Short"} Limit`
-                    : `${side === "long" ? "Long" : "Short"} ${marketPair}`}
+                ? "Market paused"
+                : mode === "limit"
+                  ? `Place ${side === "long" ? "Long" : "Short"} Limit`
+                  : `${side === "long" ? "Long" : "Short"} ${marketPair}`}
       </button>
 
       <div className="ticket-card">
@@ -448,7 +452,7 @@ export default function TradeTicket({
         <div>
           <span>Est. liq. price</span>
           <strong>
-            {parsedCollateral > 0 ? `$${summary.liq.toFixed(2)}` : "-"}
+            {parsedCollateral > 0 ? summary.liq.toFixed(4) : "-"}
           </strong>
         </div>
         <div>
@@ -456,6 +460,6 @@ export default function TradeTicket({
           <strong>{summary.fee.toFixed(4)} USDC</strong>
         </div>
       </div>
-    </aside>
+    </section>
   );
 }

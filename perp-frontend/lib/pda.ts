@@ -1,7 +1,8 @@
 import { PublicKey } from "@solana/web3.js";
 import {
   MARKET_SEED,
-  MARKET_FEED_IDS,
+  MARKET_BASE_FEED_IDS,
+  MARKET_QUOTE_FEED_IDS,
   type MarketSymbol,
   ORDER_SEED,
   POSITION_SEED,
@@ -21,10 +22,13 @@ function u64ToLittleEndianBytes(value: number): Buffer {
   return Buffer.from(bytes);
 }
 
-export function getMarketPda(marketSymbol: MarketSymbol = "SOL"): PublicKey {
-  const feedIdBytes = Buffer.from(MARKET_FEED_IDS[marketSymbol], "hex");
+// A ratio market is identified by BOTH feeds (base + quote), matching the
+// on-chain seed [MARKET_SEED, price_feed_id, quote_feed_id].
+export function getMarketPda(marketSymbol: MarketSymbol = "SOLHYPE"): PublicKey {
+  const baseFeedBytes = Buffer.from(MARKET_BASE_FEED_IDS[marketSymbol], "hex");
+  const quoteFeedBytes = Buffer.from(MARKET_QUOTE_FEED_IDS[marketSymbol], "hex");
   return PublicKey.findProgramAddressSync(
-    [Buffer.from(MARKET_SEED), feedIdBytes],
+    [Buffer.from(MARKET_SEED), baseFeedBytes, quoteFeedBytes],
     PROGRAM_ID,
   )[0];
 }
@@ -52,7 +56,7 @@ export function getLegacyUserCollateralPda(
 export function getPositionPda(
   user: PublicKey,
   positionId?: number,
-  marketSymbol: MarketSymbol = "SOL",
+  marketSymbol: MarketSymbol = "SOLHYPE",
 ): PublicKey {
   const market = getMarketPda(marketSymbol);
   const seeds = [Buffer.from(POSITION_SEED), market.toBuffer(), user.toBuffer()];
@@ -65,7 +69,7 @@ export function getPositionPda(
 export function getOrderPda(
   user: PublicKey,
   orderId: number,
-  marketSymbol: MarketSymbol = "SOL",
+  marketSymbol: MarketSymbol = "SOLHYPE",
 ): PublicKey {
   const market = getMarketPda(marketSymbol);
   return PublicKey.findProgramAddressSync(

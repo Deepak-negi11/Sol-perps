@@ -180,6 +180,35 @@ pub fn get_price_from_pyth(price_update_info: &AccountInfo, feed_id: &[u8; 32]) 
     normalize_price_to_6_decimals(price.price, price.exponent)
 }
 
+/// Reads two Pyth feeds and returns their ratio (base / quote) scaled to 6 decimals.
+/// Used for ratio markets like SOL/HYPE where the traded "price" is price(SOL) / price(HYPE).
+/// Reuses get_price_from_pyth, so both feeds inherit the staleness + confidence guards.
+pub fn get_ratio_price(
+    base_price_update: &AccountInfo,
+    quote_price_update: &AccountInfo,
+    base_feed_id: &[u8; 32],
+    quote_feed_id: &[u8; 32],
+) -> Result<u64> {
+    let base = get_price_from_pyth(base_price_update, base_feed_id)?;
+    let quote = get_price_from_pyth(quote_price_update, quote_feed_id)?;
+
+    require!(quote > 0, crate::error::SolPerpError::InvalidOraclePrice);
+
+    // ratio_6dec = base_6dec * 1e6 / quote_6dec  (keeps the 6-decimal scaling)
+    let ratio = (base as u128)
+        .checked_mul(1_000_000u128)
+        .ok_or(crate::error::SolPerpError::MathOverflow)?
+        .checked_div(quote as u128)
+        .ok_or(crate::error::SolPerpError::MathOverflow)?;
+
+    require!(
+        ratio > 0 && ratio <= u64::MAX as u128,
+        crate::error::SolPerpError::InvalidOraclePrice
+    );
+
+    Ok(ratio as u64)
+}
+
 fn normalize_price_to_6_decimals(price: i64, exponent: i32) -> Result<u64> {
     require!(price > 0, crate::error::SolPerpError::InvalidOraclePrice);
 

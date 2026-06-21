@@ -10,14 +10,15 @@ use anchor_spl::token_interface::Mint;
     max_leverage: u64,
     liquidation_threshold_bps: u64,
     trading_fees_bps: u64,
-    price_feed_id: [u8; 32]
+    price_feed_id: [u8; 32],
+    quote_feed_id: [u8; 32]
 )]
 pub struct InitializeMarket<'info> {
     #[account(
         init,
         payer = admin,
         space = 8 + Market::INIT_SPACE,
-        seeds = [MARKET_SEED, price_feed_id.as_ref()],
+        seeds = [MARKET_SEED, price_feed_id.as_ref(), quote_feed_id.as_ref()],
         bump
     )]
     pub market: Account<'info, Market>,
@@ -36,6 +37,7 @@ pub fn initialize_market_handler(
     liquidation_threshold_bps: u64,
     trading_fees_bps: u64,
     price_feed_id: [u8; 32],
+    quote_feed_id: [u8; 32],
 ) -> Result<()> {
     require!(
         max_leverage > 0 && max_leverage <= MAX_LEVERAGE_CAP,
@@ -47,6 +49,7 @@ pub fn initialize_market_handler(
     market.max_leverage = max_leverage;
     market.collateral_mint = ctx.accounts.collateral_mint.key();
     market.price_feed_id = price_feed_id;
+    market.quote_feed_id = quote_feed_id;
     market.liquidation_threshold_bps = liquidation_threshold_bps;
     market.trading_fees_bps = trading_fees_bps;
     market.bump = ctx.bumps.market;

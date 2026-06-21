@@ -6,6 +6,7 @@ pub struct Market {
     pub admin: Pubkey,
     pub max_leverage: u64,
     pub price_feed_id: [u8; 32],
+    pub quote_feed_id: [u8; 32],
     pub collateral_mint: Pubkey,
     pub liquidation_threshold_bps: u64,
     pub trading_fees_bps: u64,

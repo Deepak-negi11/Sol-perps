@@ -125,8 +125,8 @@ export default function PositionsDock({
       const [signature] = await sendWithFreshPythPrice({
         connection,
         wallet,
-        feedId: market.priceFeedId,
-        buildInstructions: async (priceUpdateAccount) => [
+        feedIds: [market.priceFeedId, market.quoteFeedId],
+        buildInstructions: async ([priceUpdateAccount, quotePriceUpdateAccount]) => [
           {
             instruction: await program.methods
               .closePosition()
@@ -134,6 +134,7 @@ export default function PositionsDock({
                 market: getMarketPda(marketSymbol),
                 position: positionPublicKey,
                 priceUpdate: priceUpdateAccount,
+                quotePriceUpdate: quotePriceUpdateAccount,
                 user: publicKey,
               })
               .instruction(),
@@ -221,7 +222,6 @@ export default function PositionsDock({
                   </thead>
                   <tbody>
                     {computedPositions.map((computedPosition) => {
-                      const sizeInTokens = computedPosition.size / (computedPosition.markPrice || 1);
                       return (
                         <tr key={computedPosition.publicKey.toString()}>
                           <td>
@@ -238,10 +238,10 @@ export default function PositionsDock({
                           <td>
                             <div className="pos-size-cell">
                               <div className={`pos-size-token ${computedPosition.isLong ? "text-long" : "text-short"}`}>
-                                {sizeInTokens.toFixed(3)} {marketSymbol === "WBTC" ? "BTC" : marketSymbol}
+                                {formatUsd(computedPosition.size)}
                               </div>
                               <div className="pos-size-usd">
-                                {formatUsd(computedPosition.size)}
+                                {computedPosition.leverage}x notional
                               </div>
                             </div>
                           </td>

@@ -30,9 +30,11 @@ function feedIdBytesToHex(feedId: number[]): `0x${string}` {
 interface SendWithFreshPythPriceParams {
   connection: Connection;
   wallet: AnchorWallet;
-  feedId: number[];
+  // One or more feed ids (e.g. [SOL, HYPE] for a ratio market). They are posted
+  // together in one transaction and the price accounts are returned in the same order.
+  feedIds: number[][];
   buildInstructions: (
-    priceUpdateAccount: PublicKey,
+    priceUpdateAccounts: PublicKey[],
   ) => Promise<InstructionWithEphemeralSigners[]>;
 }
 
@@ -82,10 +84,10 @@ async function sendVersionedTransactions(
 export async function sendWithFreshPythPrice({
   connection,
   wallet,
-  feedId,
+  feedIds,
   buildInstructions,
 }: SendWithFreshPythPriceParams): Promise<string[]> {
-  const feedIdHex = feedIdBytesToHex(feedId);
+  const feedIdHexes = feedIds.map(feedIdBytesToHex);
 
   const pythServer = new HermesClient(
     process.env.NEXT_PUBLIC_PYTH_HERMES_URL ?? DEFAULT_HERMES_ENDPOINT,
@@ -94,13 +96,13 @@ export async function sendWithFreshPythPrice({
       : undefined,
   );
 
-  const latestPrice = await pythServer.getLatestPriceUpdates([feedIdHex], {
+  const latestPrices = await pythServer.getLatestPriceUpdates(feedIdHexes, {
     encoding: "base64",
   });
-  const priceBytes = latestPrice.binary.data;
+  const priceBytes = latestPrices.binary.data;
 
   if (!priceBytes.length) {
-    throw new Error("Pyth did not return a price update for this market");
+    throw new Error("Pyth did not return price updates for this market");
   }
 
   const pythReceiver = new PythSolanaReceiver({
@@ -114,7 +116,7 @@ export async function sendWithFreshPythPrice({
   await txBuilder.addPostPriceUpdates(priceBytes);
   await txBuilder.addPriceConsumerInstructions(
     async (getPriceUpdateAccount) =>
-      buildInstructions(getPriceUpdateAccount(feedIdHex)),
+      buildInstructions(feedIdHexes.map((hex) => getPriceUpdateAccount(hex))),
   );
 
   const builtTxs = await txBuilder.buildVersionedTransactions({

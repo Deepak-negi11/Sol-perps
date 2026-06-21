@@ -10,15 +10,23 @@ export const POSITION_SEED = "position";
 export const VAULT_SEED = "vault";
 export const ORDER_SEED = "order";
 
-export type MarketSymbol = "SOL" | "ETH" | "WBTC";
+// This app is now a single RATIO market: SOL/HYPE = price(SOL) / price(HYPE).
+export type MarketSymbol = "SOLHYPE";
 
-export const MARKET_FEED_IDS: Record<MarketSymbol, string> = {
-  SOL: "ef0d8b6fda2ceba41da15d4095d1da392a0d2f8ed0c6c7bc0f4cfac8c280b56d",
-  ETH: "ff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace",
-  WBTC: "e62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43",
+export const MARKET_SYMBOLS: MarketSymbol[] = ["SOLHYPE"];
+
+// base = numerator (SOL), quote = denominator (HYPE). The traded price = base / quote.
+export const MARKET_BASE_FEED_IDS: Record<MarketSymbol, string> = {
+  SOLHYPE: "ef0d8b6fda2ceba41da15d4095d1da392a0d2f8ed0c6c7bc0f4cfac8c280b56d",
 };
 
-export const PYTH_SOL_USD_FEED_ID = MARKET_FEED_IDS.SOL;
+export const MARKET_QUOTE_FEED_IDS: Record<MarketSymbol, string> = {
+  SOLHYPE: "4279e31cc369bbcc2faf022b382b080e32a8e689ff20fbc530d2a603eb6cd98b",
+};
+
+export const MARKET_LABELS: Record<MarketSymbol, string> = {
+  SOLHYPE: "SOL/HYPE",
+};
 
 export const DEVNET_COLLATERAL_MINT =
   "AMdThvkbfjD3ynTLgG6kaTun2obhKyQ1ceqJN1pkTZPq";

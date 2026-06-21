@@ -15,13 +15,16 @@ use crate::state::{
 pub struct ExecuteTriggerOrder<'info> {
     #[account(
         mut,
-        seeds = [MARKET_SEED, market.price_feed_id.as_ref()],
+        seeds = [MARKET_SEED, market.price_feed_id.as_ref(), market.quote_feed_id.as_ref()],
         bump = market.bump
     )]
     pub market: Account<'info, Market>,
 
-    /// CHECK: Manual owner validation done in oracle module
+    /// CHECK: base (SOL) Pyth price; validated in oracle module
     pub price_update: UncheckedAccount<'info>,
+
+    /// CHECK: quote (HYPE) Pyth price; validated in oracle module
+    pub quote_price_update: UncheckedAccount<'info>,
 
     /// CHECK: This account identifies the order owner for PDA seeds.
     pub owner: UncheckedAccount<'info>,
@@ -82,9 +85,11 @@ pub fn execute_trigger_order_handler(
     require!(!ctx.accounts.market.is_paused, SolPerpError::MarketPaused);
     require!(ctx.accounts.order.is_active, SolPerpError::OrderNotActive);
 
-    let current_price = crate::oracle::get_price_from_pyth(
+    let current_price = crate::oracle::get_ratio_price(
         &ctx.accounts.price_update,
+        &ctx.accounts.quote_price_update,
         &ctx.accounts.market.price_feed_id,
+        &ctx.accounts.market.quote_feed_id,
     )?;
     require!(current_price > 0, SolPerpError::InvalidPrice);
     require!(

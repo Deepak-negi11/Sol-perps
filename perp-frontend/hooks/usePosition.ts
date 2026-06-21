@@ -27,7 +27,7 @@ export interface PositionData {
   bump: number;
 }
 
-export function usePosition(marketSymbol: MarketSymbol = "SOL") {
+export function usePosition(marketSymbol: MarketSymbol = "SOLHYPE") {
   const { connection } = useConnection();
   const { publicKey } = useWallet();
   const [position, setPosition] = useState<PositionData | null>(null);

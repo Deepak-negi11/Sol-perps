@@ -24,6 +24,7 @@ pub mod solperp_anchor {
         liquidation_threshold_bps: u64,
         trading_fees_bps: u64,
         price_feed_id: [u8; 32],
+        quote_feed_id: [u8; 32],
     ) -> Result<()> {
         initialize_market::initialize_market_handler(
             ctx,
@@ -31,6 +32,7 @@ pub mod solperp_anchor {
             liquidation_threshold_bps,
             trading_fees_bps,
             price_feed_id,
+            quote_feed_id,
         )
     }
 
