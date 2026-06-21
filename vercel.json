@@ -1,6 +1,3 @@
 {
-  "framework": "nextjs",
-  "installCommand": "cd perp-frontend && npm install",
-  "buildCommand": "cd perp-frontend && npm run build",
-  "outputDirectory": "perp-frontend/.next"
+  "framework": "nextjs"
 }
