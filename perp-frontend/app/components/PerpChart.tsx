@@ -554,7 +554,12 @@ export default function PerpChart({ price, timeframe, market }: PerpChartProps) 
     const chart = chartRef.current;
     if (!chart) return;
     chart.setBarSpace(8);
-    chart.scrollToRealTime(120);
+    chart.setOffsetRightDistance(24);
+    if (candlesRef.current.length > 0) {
+      chart.scrollToDataIndex(candlesRef.current.length - 1, 120);
+    } else {
+      chart.scrollToRealTime(120);
+    }
   }, []);
 
   const toggleFullscreen = useCallback(() => {

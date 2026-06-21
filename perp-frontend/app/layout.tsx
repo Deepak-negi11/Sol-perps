@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { Inter, Roboto_Mono } from "next/font/google";
 import "./globals.css";
-import "./shear-terminal.css";
-import "./shear-polish.css";
+import "./nyxora-terminal.css";
+import "./nyxora-polish.css";
 import "./nyxora.css";
 import WalletContextProvider from "./components/WalletContextProvider";
 import { ToastProvider } from "./components/Toast";

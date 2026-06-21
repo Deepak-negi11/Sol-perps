@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
-/* ===== Design Tokens ===== */
+
 :root {
-  /* SHEAR-style theme: near-black background, crimson accent, green/red trades. */
+  
   --bg-primary: #08090c;
   --bg-secondary: #0e0f14;
   --bg-card: rgba(18, 19, 24, 0.85);
@@ -44,7 +44,7 @@
   --font-mono: var(--font-mono);
 }
 
-/* ===== Base Styles ===== */
+
 * {
   box-sizing: border-box;
 }
@@ -66,7 +66,7 @@ body::before {
   z-index: 0;
 }
 
-/* ===== Glass Card ===== */
+
 .glass-card {
   background: var(--bg-card);
   backdrop-filter: blur(var(--glass-blur));
@@ -83,7 +83,7 @@ body::before {
   border-color: var(--border-active);
 }
 
-/* ===== Top Bar ===== */
+
 .top-bar {
   display: flex;
   align-items: center;
@@ -149,7 +149,7 @@ body::before {
   color: var(--text-primary);
 }
 
-/* ===== Layout Grid ===== */
+
 .main-grid {
   display: grid;
   grid-template-columns: 320px 1fr 340px;
@@ -175,7 +175,7 @@ body::before {
   }
 }
 
-/* ===== Section Headers ===== */
+
 .section-header {
   display: flex;
   align-items: center;
@@ -210,7 +210,7 @@ body::before {
   color: var(--short-red);
 }
 
-/* ===== Stat Rows ===== */
+
 .stat-row {
   display: flex;
   justify-content: space-between;
@@ -234,7 +234,7 @@ body::before {
   color: var(--text-primary);
 }
 
-/* ===== Input Styles ===== */
+
 .input-group {
   margin-bottom: 14px;
 }
@@ -291,7 +291,7 @@ body::before {
   color: var(--text-muted);
 }
 
-/* ===== Buttons ===== */
+
 .btn {
   display: inline-flex;
   align-items: center;
@@ -374,7 +374,7 @@ body::before {
   background: rgba(245, 158, 11, 0.25);
 }
 
-/* ===== Toggle Tabs ===== */
+
 .tab-group {
   display: flex;
   background: var(--bg-input);
@@ -416,7 +416,7 @@ body::before {
   background: linear-gradient(135deg, #dc2626, var(--short-red));
 }
 
-/* ===== Leverage Slider ===== */
+
 .leverage-slider {
   width: 100%;
   appearance: none;
@@ -460,7 +460,7 @@ body::before {
   font-family: var(--font-mono);
 }
 
-/* ===== Health Bar ===== */
+
 .health-bar-container {
   margin-top: 16px;
 }
@@ -524,7 +524,7 @@ body::before {
   font-family: var(--font-mono);
 }
 
-/* ===== Position Side Badge ===== */
+
 .side-badge {
   display: inline-flex;
   align-items: center;
@@ -547,7 +547,7 @@ body::before {
   color: var(--short-red);
 }
 
-/* ===== PnL Values ===== */
+
 .pnl-positive {
   color: var(--long-green);
 }
@@ -556,7 +556,7 @@ body::before {
   color: var(--short-red);
 }
 
-/* ===== Toast Notifications ===== */
+
 .toast-container {
   position: fixed;
   bottom: 20px;
@@ -610,7 +610,7 @@ body::before {
   }
 }
 
-/* ===== Wallet Button Override ===== */
+
 .wallet-adapter-button {
   background: linear-gradient(135deg, var(--accent-blue), #6366f1) !important;
   border-radius: var(--radius-md) !important;
@@ -630,7 +630,7 @@ body::before {
   border-radius: var(--radius-xl) !important;
 }
 
-/* ===== Empty State ===== */
+
 .empty-state {
   display: flex;
   flex-direction: column;
@@ -651,7 +651,7 @@ body::before {
   color: var(--text-muted);
 }
 
-/* ===== Spinner ===== */
+
 .spinner {
   width: 20px;
   height: 20px;
@@ -667,12 +667,12 @@ body::before {
   }
 }
 
-/* ===== Card Padding ===== */
+
 .card-body {
   padding: 18px;
 }
 
-/* ===== Admin Panel ===== */
+
 .admin-actions {
   display: flex;
   flex-direction: column;
@@ -688,14 +688,14 @@ body::before {
   flex: 1;
 }
 
-/* ===== Column Stacks ===== */
+
 .column-stack {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
-/* ===== Max button ===== */
+
 .max-btn {
   position: absolute;
   right: 14px;
@@ -716,7 +716,7 @@ body::before {
   background: rgba(59, 130, 246, 0.25);
 }
 
-/* ===== Trading Terminal Redesign ===== */
+
 .perp-shell {
   min-height: 100vh;
   background:
@@ -1658,7 +1658,7 @@ body::before {
   cursor: not-allowed;
 }
 
-/* ===== Collateral Console (Deposit / Withdraw) ===== */
+
 .collateral-console {
   margin-top: 14px;
   padding-top: 12px;
@@ -2443,7 +2443,7 @@ body::before {
   background-color: rgba(0, 199, 180, 0.4);
 }
 
-/* ===== Deposit Button and Modal Redesign ===== */
+
 .deposit-btn-header {
   height: 36px;
   padding: 0 16px;
@@ -2541,7 +2541,7 @@ body::before {
   padding: 0 !important;
 }
 
-/* ===== Improved Positions Table alignment (Drift style) ===== */
+
 .pos-market-cell {
   display: flex;
   flex-direction: column;
@@ -2643,7 +2643,7 @@ body::before {
   color: #ff4a5d !important;
 }
 
-/* ===== Balances Tab style ===== */
+
 .balances-grid-table {
   width: 100%;
   border-collapse: collapse;
@@ -2742,7 +2742,7 @@ body::before {
   }
 }
 
-/* ===== SHEAR-inspired terminal pass ===== */
+
 .perp-shell {
   background:
     linear-gradient(180deg, rgba(76, 18, 26, 0.1), transparent 170px),

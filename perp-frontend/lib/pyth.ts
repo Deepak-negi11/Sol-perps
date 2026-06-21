@@ -30,8 +30,8 @@ function feedIdBytesToHex(feedId: number[]): `0x${string}` {
 interface SendWithFreshPythPriceParams {
   connection: Connection;
   wallet: AnchorWallet;
-  // One or more feed ids (e.g. [SOL, HYPE] for a ratio market). They are posted
-  // together in one transaction and the price accounts are returned in the same order.
+  
+  
   feedIds: number[][];
   buildInstructions: (
     priceUpdateAccounts: PublicKey[],

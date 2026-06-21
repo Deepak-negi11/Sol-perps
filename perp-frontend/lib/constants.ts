@@ -10,12 +10,12 @@ export const POSITION_SEED = "position";
 export const VAULT_SEED = "vault";
 export const ORDER_SEED = "order";
 
-// This app is now a single RATIO market: SOL/HYPE = price(SOL) / price(HYPE).
+
 export type MarketSymbol = "SOLHYPE";
 
 export const MARKET_SYMBOLS: MarketSymbol[] = ["SOLHYPE"];
 
-// base = numerator (SOL), quote = denominator (HYPE). The traded price = base / quote.
+
 export const MARKET_BASE_FEED_IDS: Record<MarketSymbol, string> = {
   SOLHYPE: "ef0d8b6fda2ceba41da15d4095d1da392a0d2f8ed0c6c7bc0f4cfac8c280b56d",
 };

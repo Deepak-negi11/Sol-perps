@@ -57,9 +57,9 @@ export function useMarket(marketSymbol: MarketSymbol = "SOLHYPE") {
         ) => txs,
       };
       const provider = new AnchorProvider(connection, readonlyWallet, { commitment: "confirmed" });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      
       const program = new Program(idl as any, provider);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      
       const marketAccount = await (program.account as any).market.fetch(marketAddress);
       setMarket(marketAccount as MarketData);
       setError(null);
@@ -77,7 +77,7 @@ export function useMarket(marketSymbol: MarketSymbol = "SOLHYPE") {
   }, [connection, marketSymbol]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    
     fetchMarket();
 
     const marketAddress = getMarketPda(marketSymbol);

@@ -197,7 +197,7 @@ export function useTradeHistory() {
   }, [connection, publicKey]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    
     fetchHistory();
   }, [fetchHistory]);
 

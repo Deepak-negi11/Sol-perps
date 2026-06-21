@@ -56,11 +56,11 @@ export function usePosition(marketSymbol: MarketSymbol = "SOLHYPE") {
       const provider = new AnchorProvider(connection, readonlyWallet, {
         commitment: "confirmed",
       });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      
       const program = new Program(idl as any, provider);
       const marketAddress = getMarketPda(marketSymbol);
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      
       const positionAccounts = await (program.account as any).position.all([
         {
           memcmp: {
@@ -100,7 +100,7 @@ export function usePosition(marketSymbol: MarketSymbol = "SOLHYPE") {
   }, [connection, marketSymbol, publicKey]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    
     fetchPosition();
 
     if (!publicKey) return;

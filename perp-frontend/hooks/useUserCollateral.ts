@@ -43,9 +43,9 @@ export function useUserCollateral(_marketSymbol: MarketSymbol = "SOLHYPE") {
         ) => txs,
       };
       const provider = new AnchorProvider(connection, readonlyWallet, { commitment: "confirmed" });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      
       const program = new Program(idl as any, provider);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      
       const collateralAccount = await (program.account as any).userCollateral.fetch(collateralAddress);
       setData(collateralAccount as UserCollateralData);
     } catch {
@@ -56,7 +56,7 @@ export function useUserCollateral(_marketSymbol: MarketSymbol = "SOLHYPE") {
   }, [connection, publicKey]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    
     fetchData();
 
     if (!publicKey) return;

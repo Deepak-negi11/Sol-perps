@@ -31,7 +31,7 @@ export function useProgram(): SolperpProgram | null {
       { commitment: "confirmed" }
     );
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    
     return new Program(idl as any, provider) as unknown as SolperpProgram;
   }, [connection, wallet.publicKey, wallet.signTransaction, wallet.signAllTransactions]);
 }
@@ -50,7 +50,7 @@ export function useReadonlyProgram(): SolperpProgram {
       ) => txs,
     };
     const provider = new AnchorProvider(connection, readonlyWallet, { commitment: "confirmed" });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    
     return new Program(idl as any, provider) as unknown as SolperpProgram;
   }, [connection]);
 }

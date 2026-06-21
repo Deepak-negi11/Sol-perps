@@ -16,8 +16,8 @@ interface PythPriceData {
   publishTime: number;
 }
 
-// Streams the two underlying feeds (SOL + HYPE) and returns their RATIO as the
-// price, so Mark Price = price(SOL) / price(HYPE).
+
+
 export function usePythPrice(marketSymbol: MarketSymbol = "SOLHYPE") {
   const [priceData, setPriceData] = useState<PythPriceData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -34,7 +34,7 @@ export function usePythPrice(marketSymbol: MarketSymbol = "SOLHYPE") {
       | null = null;
     let stopped = false;
 
-    // Latest price for each leg; we can only form the ratio once both arrived.
+    
     let latestBase: number | null = null;
     let latestQuote: number | null = null;
 
@@ -56,7 +56,7 @@ export function usePythPrice(marketSymbol: MarketSymbol = "SOLHYPE") {
 
         for (const entry of parsedPrices) {
           const value = Number(entry.price.price) * Math.pow(10, entry.price.expo);
-          // Hermes reports the feed id without the "0x" prefix.
+          
           if (entry.id === baseId) latestBase = value;
           else if (entry.id === quoteId) latestQuote = value;
         }

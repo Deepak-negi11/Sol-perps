@@ -13,7 +13,7 @@ export function useLiveTrades(marketSymbol?: MarketSymbol) {
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    
     setConnected(true);
 
     const subscriptionId = connection.onLogs(

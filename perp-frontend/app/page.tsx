@@ -95,7 +95,7 @@ export default function Home() {
   const { positions, refetch: refetchPosition } = usePosition(selectedMarket);
   const { history, refetch: refetchHistory } = useTradeHistory();
 
-  // The "price" here is the SOL/HYPE ratio (unitless), not a dollar value.
+  
   const price = priceData?.price ?? 0;
   const displayPrice = price > 0 ? price : 0.04166;
   const openInterest = market

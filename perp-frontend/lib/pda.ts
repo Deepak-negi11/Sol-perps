@@ -22,8 +22,8 @@ function u64ToLittleEndianBytes(value: number): Buffer {
   return Buffer.from(bytes);
 }
 
-// A ratio market is identified by BOTH feeds (base + quote), matching the
-// on-chain seed [MARKET_SEED, price_feed_id, quote_feed_id].
+
+
 export function getMarketPda(marketSymbol: MarketSymbol = "SOLHYPE"): PublicKey {
   const baseFeedBytes = Buffer.from(MARKET_BASE_FEED_IDS[marketSymbol], "hex");
   const quoteFeedBytes = Buffer.from(MARKET_QUOTE_FEED_IDS[marketSymbol], "hex");

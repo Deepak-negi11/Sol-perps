@@ -1,6 +1,6 @@
-/* ===== SHEAR polish: wallet CTA, left drawing rail, micro-interactions ===== */
 
-/* --- Connect-wallet CTA: solid crimson, no pink/purple gradient --- */
+
+
 .connect-state .wallet-adapter-button,
 .connect-state .wallet-adapter-button.wallet-btn {
   width: 100%;
@@ -25,7 +25,7 @@
   transform: translateY(1px) !important;
 }
 
-/* --- Drawing tools as a left vertical rail (SHEAR-style) --- */
+
 .terminal-chart-stage {
   position: relative;
 }
@@ -56,7 +56,7 @@
   display: none;
 }
 
-/* --- Micro-interactions --- */
+
 .ticket-submit,
 .setup-submit,
 .admin-save-btn,
@@ -109,7 +109,7 @@
   filter: brightness(1.12);
 }
 
-@keyframes shear-pulse-dot {
+@keyframes nyxora-pulse-dot {
 
   0%,
   100% {
