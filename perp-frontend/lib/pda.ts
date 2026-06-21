@@ -37,6 +37,7 @@ export function getUserCollateralPda(
   user: PublicKey,
   _marketSymbol?: MarketSymbol,
 ): PublicKey {
+  void _marketSymbol;
   return PublicKey.findProgramAddressSync(
     [Buffer.from(USER_COLLATERAL_SEED), user.toBuffer()],
     PROGRAM_ID,

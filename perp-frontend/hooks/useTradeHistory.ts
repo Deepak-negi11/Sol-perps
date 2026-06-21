@@ -197,8 +197,7 @@ export function useTradeHistory() {
   }, [connection, publicKey]);
 
   useEffect(() => {
-    
-    fetchHistory();
+    void Promise.resolve().then(fetchHistory);
   }, [fetchHistory]);
 
   return { history, loading, error, refetch: fetchHistory };

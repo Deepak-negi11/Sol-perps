@@ -3,7 +3,6 @@ import { Inter, Roboto_Mono } from "next/font/google";
 import "./globals.css";
 import "./nyxora-terminal.css";
 import "./nyxora-polish.css";
-import "./nyxora.css";
 import WalletContextProvider from "./components/WalletContextProvider";
 import { ToastProvider } from "./components/Toast";
 

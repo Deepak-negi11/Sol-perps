@@ -13,8 +13,7 @@ export function useLiveTrades(marketSymbol?: MarketSymbol) {
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
-    
-    setConnected(true);
+    const connectedTimer = window.setTimeout(() => setConnected(true), 0);
 
     const subscriptionId = connection.onLogs(
       PROGRAM_ID,
@@ -33,6 +32,7 @@ export function useLiveTrades(marketSymbol?: MarketSymbol) {
     );
 
     return () => {
+      window.clearTimeout(connectedTimer);
       connection.removeOnLogsListener(subscriptionId);
       setConnected(false);
     };

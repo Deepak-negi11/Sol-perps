@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { Program, AnchorProvider, BN } from "@coral-xyz/anchor";
+import { Program, AnchorProvider, BN, type Idl } from "@coral-xyz/anchor";
 import { getUserCollateralPda } from "@/lib/pda";
 import idl from "@/lib/idl/solperp_anchor.json";
 import type { MarketSymbol } from "@/lib/constants";
@@ -17,7 +17,14 @@ export interface UserCollateralData {
   bump: number;
 }
 
+type UserCollateralAccountClient = {
+  userCollateral: {
+    fetch: (address: PublicKey) => Promise<UserCollateralData>;
+  };
+};
+
 export function useUserCollateral(_marketSymbol: MarketSymbol = "SOLHYPE") {
+  void _marketSymbol;
   const { connection } = useConnection();
   const { publicKey } = useWallet();
   const [data, setData] = useState<UserCollateralData | null>(null);
@@ -44,10 +51,11 @@ export function useUserCollateral(_marketSymbol: MarketSymbol = "SOLHYPE") {
       };
       const provider = new AnchorProvider(connection, readonlyWallet, { commitment: "confirmed" });
       
-      const program = new Program(idl as any, provider);
+      const program = new Program(idl as Idl, provider);
+      const userCollateralAccount = program.account as unknown as UserCollateralAccountClient;
       
-      const collateralAccount = await (program.account as any).userCollateral.fetch(collateralAddress);
-      setData(collateralAccount as UserCollateralData);
+      const collateralAccount = await userCollateralAccount.userCollateral.fetch(collateralAddress);
+      setData(collateralAccount);
     } catch {
       setData(null);
     } finally {
@@ -56,8 +64,7 @@ export function useUserCollateral(_marketSymbol: MarketSymbol = "SOLHYPE") {
   }, [connection, publicKey]);
 
   useEffect(() => {
-    
-    fetchData();
+    void Promise.resolve().then(fetchData);
 
     if (!publicKey) return;
     const collateralAddress = getUserCollateralPda(publicKey);

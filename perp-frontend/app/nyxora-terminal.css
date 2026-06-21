@@ -20,28 +20,28 @@
   justify-self: start;
   display: flex;
   align-items: center;
-  gap: 26px;
+  gap: 28px;
 }
 
 .brand-lockup {
-  gap: 7px;
+  gap: 6px;
   color: #f2f2f2;
-  font-size: 1.42rem;
+  font-size: 1.14rem;
   line-height: 1;
 }
 
 .brand-mark {
-  width: 40px;
-  height: 40px;
-  border-radius: 2px;
+  width: 34px;
+  height: 34px;
+  border-radius: 4px;
   overflow: hidden;
   background: #050505;
 }
 
 .brand-lockup>strong {
-  transform: translateY(-1px);
+  transform: translateY(-0.5px);
   font-family: var(--font-ui-sans), Inter, system-ui, sans-serif;
-  font-weight: 900;
+  font-weight: 520;
   letter-spacing: 0;
 }
 
@@ -165,8 +165,8 @@
 }
 
 .account-logo {
-  width: 19px;
-  height: 19px;
+  width: 22px;
+  height: 22px;
   overflow: hidden;
   border: 2px solid #68a6ff;
   border-radius: 5px;
@@ -960,6 +960,7 @@
 .positions-grid-table,
 .balances-grid-table,
 .history-grid-table {
+  min-width: 800px;
   font-size: 0.68rem;
 }
 
@@ -985,15 +986,15 @@
 .nyx-page-shell {
   max-width: 1380px;
   margin: 0 auto;
-  padding: 42px 0 28px;
+  padding: 24px 28px;
   color: #f2f2f2;
 }
 
 .nyx-page {
   position: relative;
-  max-width: 1080px;
+  max-width: 1280px;
   margin: 0 auto;
-  padding: 36px 34px;
+  padding: 24px 28px;
   overflow: hidden;
   background:
     linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
@@ -1006,7 +1007,8 @@
 
 .nyx-hero {
   position: relative;
-  min-height: 176px;
+  min-height: auto;
+  margin-bottom: 20px;
 }
 
 .nyx-hero>span {
@@ -1022,19 +1024,19 @@
 }
 
 .nyx-hero h1 {
-  margin: 18px 0 10px;
+  margin: 12px 0 6px;
   color: #f8f8f8;
-  font-size: clamp(2rem, 4vw, 3rem);
+  font-size: 1.75rem;
   line-height: 1;
-  font-weight: 900;
+  font-weight: 800;
 }
 
 .nyx-hero p {
-  max-width: 620px;
+  max-width: 720px;
   margin: 0;
   color: #9c9c9c;
-  font-size: 1rem;
-  line-height: 1.55;
+  font-size: 0.88rem;
+  line-height: 1.45;
 }
 
 .nyx-ghost-btn,
@@ -1057,7 +1059,7 @@
 .nyx-hero .nyx-ghost-btn {
   position: absolute;
   right: 0;
-  bottom: 18px;
+  bottom: 0;
 }
 
 .nyx-section-head {
@@ -1158,8 +1160,8 @@
 .nyx-position-metrics {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 26px;
-  padding: 24px 22px;
+  gap: 16px;
+  padding: 16px 20px;
 }
 
 .nyx-position-metrics div,
@@ -1176,7 +1178,7 @@
 .nyx-detail-box span,
 .nyx-inline-stats span {
   color: #888;
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 850;
   text-transform: uppercase;
 }
@@ -1188,7 +1190,7 @@
 .nyx-inline-stats strong {
   color: #f2f2f2;
   font-family: var(--font-mono);
-  font-size: 1.35rem;
+  font-size: 1.15rem;
   line-height: 1;
 }
 
@@ -1196,7 +1198,7 @@
 .nyx-metric-card em {
   color: #9a9a9a;
   font-style: normal;
-  font-size: 0.76rem;
+  font-size: 0.72rem;
 }
 
 .nyx-empty-panel {
@@ -1210,7 +1212,7 @@
 .nyx-chip-row {
   display: flex;
   gap: 7px;
-  margin: 0 0 22px;
+  margin: 0 0 16px;
 }
 
 .nyx-chip-row span {
@@ -1229,7 +1231,7 @@
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
-  margin-bottom: 24px;
+  margin-bottom: 18px;
 }
 
 .nyx-metric-grid.profile {
@@ -1237,11 +1239,14 @@
 }
 
 .nyx-metric-card {
-  min-height: 118px;
-  padding: 18px;
+  min-height: 96px;
+  padding: 12px 14px;
+  gap: 6px;
 }
 
 .nyx-metric-card svg {
+  width: 14px;
+  height: 14px;
   color: #8a8a8a;
 }
 
@@ -1256,7 +1261,7 @@
 }
 
 .nyx-page-card {
-  padding: 22px;
+  padding: 16px;
 }
 
 .nyx-page-card h2 {
@@ -1267,17 +1272,18 @@
 .nyx-inline-stats {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 18px;
-  margin-bottom: 22px;
+  gap: 12px;
+  margin-bottom: 16px;
 }
 
 .nyx-detail-box {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 12px;
-  padding: 18px;
+  gap: 8px 12px;
+  padding: 12px 14px;
   border: 1px solid #252525;
   background: #121212;
+  font-size: 0.82rem;
 }
 
 .nyx-detail-box.small {
@@ -1319,7 +1325,7 @@
 }
 
 .nyx-liquidity-form input {
-  height: 44px;
+  height: 38px;
   padding: 0 12px;
   border: 1px solid #292929;
   border-radius: 0;
@@ -1331,7 +1337,8 @@
 
 .nyx-danger-btn {
   width: 100%;
-  margin-top: 16px;
+  height: 38px;
+  margin-top: 12px;
   color: #ffb8c2;
   background: #9c1f33;
   border-color: #9c1f33;
@@ -1443,12 +1450,12 @@
 }
 
 .nyx-footer {
-  max-width: 1080px;
+  max-width: 1280px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 160px 180px;
   gap: 48px;
-  margin: 96px auto 0;
-  padding-top: 30px;
+  margin: 48px auto 0;
+  padding-top: 24px;
   border-top: 1px solid #171717;
   color: #868686;
 }

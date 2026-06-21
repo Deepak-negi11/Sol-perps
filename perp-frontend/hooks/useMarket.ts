@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useConnection } from "@solana/wallet-adapter-react";
-import { Program, AnchorProvider, BN } from "@coral-xyz/anchor";
+import { Program, AnchorProvider, BN, type Idl } from "@coral-xyz/anchor";
 import { getMarketPda } from "@/lib/pda";
 import { PROGRAM_ID } from "@/lib/constants";
 import type { MarketSymbol } from "@/lib/constants";
@@ -26,7 +26,15 @@ export interface MarketData {
   bump: number;
 }
 
+type MarketAccountClient = {
+  market: {
+    fetch: (address: PublicKey) => Promise<MarketData>;
+  };
+};
+
+// why do we create a cutom hooks ??
 export function useMarket(marketSymbol: MarketSymbol = "SOLHYPE") {
+  
   const { connection } = useConnection();
   const [market, setMarket] = useState<MarketData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -35,17 +43,17 @@ export function useMarket(marketSymbol: MarketSymbol = "SOLHYPE") {
 
   const fetchMarket = useCallback(async () => {
     try {
-      const marketAddress = getMarketPda(marketSymbol);
-      setMarketPda(marketAddress);
+      const pda = getMarketPda(marketSymbol);
+      setMarketPda(pda);
 
-      const deployedProgram = await connection.getAccountInfo(PROGRAM_ID);
-      if (!deployedProgram) {
+      const programAccount = await connection.getAccountInfo(PROGRAM_ID);
+      if (!programAccount) {
         setMarket(null);
         setError("Program not deployed on devnet");
         return;
       }
 
-      const readonlyWallet = {
+      const dummyWallet = {
         publicKey: PublicKey.default,
         signTransaction: async <T extends Transaction | VersionedTransaction>(
           tx: T,
@@ -56,20 +64,19 @@ export function useMarket(marketSymbol: MarketSymbol = "SOLHYPE") {
           txs: T[],
         ) => txs,
       };
-      const provider = new AnchorProvider(connection, readonlyWallet, { commitment: "confirmed" });
-      
-      const program = new Program(idl as any, provider);
-      
-      const marketAccount = await (program.account as any).market.fetch(marketAddress);
-      setMarket(marketAccount as MarketData);
+      const provider = new AnchorProvider(connection, dummyWallet, { commitment: "confirmed" });
+      const program = new Program(idl as Idl, provider);
+      const marketAccount = program.account as unknown as MarketAccountClient;
+      const data = await marketAccount.market.fetch(pda);
+      setMarket(data);
       setError(null);
-    } catch (caught: unknown) {
-      const message = caught instanceof Error ? caught.message : String(caught);
-      if (message.includes("Account does not exist")) {
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg.includes("Account does not exist")) {
         setMarket(null);
         setError("Market not initialized");
       } else {
-        setError(message);
+        setError(msg);
       }
     } finally {
       setLoading(false);
@@ -77,18 +84,17 @@ export function useMarket(marketSymbol: MarketSymbol = "SOLHYPE") {
   }, [connection, marketSymbol]);
 
   useEffect(() => {
-    
-    fetchMarket();
+    void Promise.resolve().then(fetchMarket);
 
-    const marketAddress = getMarketPda(marketSymbol);
-    const subscriptionId = connection.onAccountChange(marketAddress, () => fetchMarket(), "confirmed");
-    const safetyTimer = setInterval(fetchMarket, 30_000);
+    const pda = getMarketPda(marketSymbol);
+    const subId = connection.onAccountChange(pda , ()=> fetchMarket(),"confirmed");
 
+    const interval = setInterval(fetchMarket, 10_000);
     return () => {
-      connection.removeAccountChangeListener(subscriptionId);
-      clearInterval(safetyTimer);
-    };
-  }, [connection, marketSymbol, fetchMarket]);
+      connection.removeAccountChangeListener(subId);
+      clearInterval(interval);
+    }
+  }, [connection, marketSymbol,fetchMarket]);
 
   const refetch = useCallback(() => {
     fetchMarket();

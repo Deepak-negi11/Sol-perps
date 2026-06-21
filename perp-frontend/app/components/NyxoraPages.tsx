@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import {
   ArrowRight,
   Database,
@@ -16,7 +16,11 @@ import type { MarketData } from "@/hooks/useMarket";
 import type { PositionData } from "@/hooks/usePosition";
 import type { TradeHistoryItem } from "@/hooks/useTradeHistory";
 import { MARKET_LABELS, type MarketSymbol } from "@/lib/constants";
-import { formatUsd, lamportsToToken, shortenAddress } from "@/lib/format";
+import { formatUsd, lamportsToToken, tokenToLamports, shortenAddress } from "@/lib/format";
+import { useProgram } from "@/hooks/useProgram";
+import { useToast } from "./Toast";
+import { getMarketPda, getVaultAuthorityPda } from "@/lib/pda";
+import { TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID, getAssociatedTokenAddress } from "@solana/spl-token";
 
 interface SharedPageProps {
   market: MarketData | null;
@@ -30,27 +34,32 @@ interface SharedPageProps {
   availableBalance: number;
   poolUtilization: number;
   onTrade: () => void;
+  onUpdate?: () => void;
 }
+
+const FOOTER_PRODUCT_LINKS = ["Trade", "Pool"];
+const FOOTER_COPY =
+  "Ratio perpetuals on Solana devnet. One pool, one margin engine, live oracle settlement.";
+const TWITTER_HANDLE = "@depx_____";
+const TWITTER_URL = "https://x.com/depx_____";
 
 function NyxoraFooter() {
   return (
     <footer className="nyx-footer">
       <div className="nyx-footer-brand">
         <strong>Nyxora</strong>
-        <span>
-          Ratio perpetuals on Solana devnet. One pool, one margin engine, live
-          oracle settlement.
-        </span>
+        <span>{FOOTER_COPY}</span>
       </div>
       <div>
         <strong>Product</strong>
-        <span>Trade</span>
-        <span>Pool</span>
+        {FOOTER_PRODUCT_LINKS.map((item) => (
+          <span key={item}>{item}</span>
+        ))}
       </div>
       <div>
         <strong>Connect</strong>
-        <a href="https://x.com/deepx_____" target="_blank" rel="noreferrer">
-          @deepx_____
+        <a href={TWITTER_URL} target="_blank" rel="noreferrer">
+          {TWITTER_HANDLE}
         </a>
       </div>
     </footer>
@@ -202,6 +211,82 @@ export function PoolPage(props: SharedPageProps) {
     ? lamportsToToken(props.market.totalTradingFeesCollected)
     : 0;
 
+  const [amount, setAmount] = useState("");
+  const [tab, setTab] = useState<"deposit" | "withdraw">("deposit");
+  const [submitting, setSubmitting] = useState(false);
+  const program = useProgram();
+  const { addToast } = useToast();
+
+  const isAdmin =
+    props.market &&
+    props.publicKey &&
+    props.market.admin.toString() === props.publicKey.toString();
+
+  const userShares = isAdmin ? props.poolBalance : 0;
+  const userValue = isAdmin ? props.poolBalance : 0;
+  const userSharePct = isAdmin ? "100.00%" : "0.00%";
+
+  const handleLiquidity = async () => {
+    if (!program || !props.market || !props.publicKey || !amount) return;
+    setSubmitting(true);
+    try {
+      const lamports = tokenToLamports(parseFloat(amount));
+      const marketPda = getMarketPda(props.marketSymbol);
+      const vaultAuthority = getVaultAuthorityPda();
+      const vaultTokenAccount = await getAssociatedTokenAddress(
+        props.market.collateralMint,
+        vaultAuthority,
+        true
+      );
+      const adminTokenAccount = await getAssociatedTokenAddress(
+        props.market.collateralMint,
+        props.publicKey
+      );
+
+      addToast(
+        tab === "deposit" ? "Adding pool liquidity..." : "Removing pool liquidity...",
+        "info"
+      );
+
+      const txBuilder =
+        tab === "deposit"
+          ? program.methods.addLiquidity(lamports).accounts({
+            market: marketPda,
+            vaultAuthority,
+            collateralMint: props.market.collateralMint,
+            adminTokenAccount,
+            vaultTokenAccount,
+            admin: props.publicKey,
+            tokenProgram: TOKEN_PROGRAM_ID,
+            associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+          })
+          : program.methods.removeLiquidity(lamports).accounts({
+            market: marketPda,
+            vaultAuthority,
+            collateralMint: props.market.collateralMint,
+            vaultTokenAccount,
+            adminTokenAccount,
+            admin: props.publicKey,
+            tokenProgram: TOKEN_PROGRAM_ID,
+            associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+          });
+
+      const signature = await txBuilder.rpc();
+      addToast(
+        tab === "deposit" ? "Liquidity added successfully!" : "Liquidity removed successfully!",
+        "success",
+        signature
+      );
+      setAmount("");
+      props.onUpdate?.();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      addToast(`Liquidity action failed: ${message}`, "error");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <div className="nyx-page-shell">
       <section className="nyx-page">
@@ -259,15 +344,15 @@ export function PoolPage(props: SharedPageProps) {
             <div className="nyx-inline-stats">
               <div>
                 <span>Your shares</span>
-                <strong>0.00</strong>
+                <strong>{userShares.toFixed(2)}</strong>
               </div>
               <div>
                 <span>Value</span>
-                <strong>{formatUsd(0)}</strong>
+                <strong>{formatUsd(userValue)}</strong>
               </div>
               <div>
                 <span>Pool share</span>
-                <strong>0.00%</strong>
+                <strong>{userSharePct}</strong>
               </div>
             </div>
             <div className="nyx-detail-box">
@@ -282,21 +367,57 @@ export function PoolPage(props: SharedPageProps) {
 
           <article className="nyx-page-card nyx-liquidity-form">
             <div className="nyx-tabs">
-              <button className="active">Deposit</button>
-              <button>Withdraw</button>
+              <button
+                className={tab === "deposit" ? "active" : ""}
+                onClick={() => setTab("deposit")}
+              >
+                Deposit
+              </button>
+              <button
+                className={tab === "withdraw" ? "active" : ""}
+                onClick={() => setTab("withdraw")}
+              >
+                Withdraw
+              </button>
             </div>
             <label>
               Amount (USDC)
-              <input placeholder="0.00" inputMode="decimal" />
+              <input
+                type="number"
+                placeholder="0.00"
+                inputMode="decimal"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                min="0"
+                step="0.01"
+              />
             </label>
             <div className="nyx-detail-box small">
               <span>Shares minted</span>
-              <strong>0.00</strong>
+              <strong>{amount ? parseFloat(amount).toFixed(2) : "0.00"}</strong>
               <span>NAV / share</span>
               <strong>{navPerShare.toFixed(4)}</strong>
             </div>
-            <button className="nyx-danger-btn" disabled>
-              Deposit liquidity
+            <button
+              className="nyx-danger-btn"
+              onClick={handleLiquidity}
+              disabled={
+                submitting ||
+                !amount ||
+                parseFloat(amount) <= 0 ||
+                !props.publicKey ||
+                !isAdmin
+              }
+            >
+              {submitting
+                ? "Processing..."
+                : !props.publicKey
+                  ? "Wallet not connected"
+                  : !isAdmin
+                    ? "Admin signature required"
+                    : tab === "deposit"
+                      ? "Deposit liquidity"
+                      : "Withdraw liquidity"}
             </button>
           </article>
         </div>

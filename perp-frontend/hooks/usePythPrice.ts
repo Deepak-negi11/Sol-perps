@@ -16,7 +16,18 @@ interface PythPriceData {
   publishTime: number;
 }
 
-
+function readPythPrice(parsedPrice: {
+  price: string;
+  conf: string;
+  expo: number;
+  publish_time: number;
+}) {
+  return {
+    price: Number(parsedPrice.price) * Math.pow(10, parsedPrice.expo),
+    confidence: Number(parsedPrice.conf) * Math.pow(10, parsedPrice.expo),
+    publishTime: parsedPrice.publish_time,
+  };
+}
 
 export function usePythPrice(marketSymbol: MarketSymbol = "SOLHYPE") {
   const [priceData, setPriceData] = useState<PythPriceData | null>(null);
@@ -24,67 +35,52 @@ export function usePythPrice(marketSymbol: MarketSymbol = "SOLHYPE") {
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
-    const baseId = MARKET_BASE_FEED_IDS[marketSymbol];
-    const quoteId = MARKET_QUOTE_FEED_IDS[marketSymbol];
+    const feedIds = [
+      `0x${MARKET_BASE_FEED_IDS[marketSymbol]}`,
+      `0x${MARKET_QUOTE_FEED_IDS[marketSymbol]}`,
+    ];
+    const hermes = new HermesClient("https://hermes.pyth.network");
 
-    const pythServer = new HermesClient("https://hermes.pyth.network");
-
-    let priceStream:
-      | Awaited<ReturnType<typeof pythServer.getPriceUpdatesStream>>
+    let eventSource: Awaited<ReturnType<typeof hermes.getPriceUpdatesStream>>
       | null = null;
-    let stopped = false;
-
-    
-    let latestBase: number | null = null;
-    let latestQuote: number | null = null;
+    let cancelled = false;
 
     async function startStream() {
-      priceStream = await pythServer.getPriceUpdatesStream(
-        [`0x${baseId}`, `0x${quoteId}`],
-        { parsed: true },
-      );
+      eventSource = await hermes.getPriceUpdatesStream(feedIds, {
+        parsed: true,
+      });
+      if (cancelled) { eventSource.close(); return; }
 
-      if (stopped) {
-        priceStream.close();
-        return;
-      }
-
-      priceStream.onmessage = (message) => {
-        const update = JSON.parse(message.data);
-        const parsedPrices = update.parsed;
-        if (!parsedPrices) return;
-
-        for (const entry of parsedPrices) {
-          const value = Number(entry.price.price) * Math.pow(10, entry.price.expo);
-          
-          if (entry.id === baseId) latestBase = value;
-          else if (entry.id === quoteId) latestQuote = value;
-        }
-
-        if (latestBase !== null && latestQuote !== null && latestQuote > 0) {
+      eventSource.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        const parsed = data.parsed;
+        if (parsed && parsed.length >= 2) {
+          const base = readPythPrice(parsed[0].price);
+          const quote = readPythPrice(parsed[1].price);
+          const ratio = quote.price > 0 ? base.price / quote.price : 0;
           setPriceData({
-            price: latestBase / latestQuote,
-            basePrice: latestBase,
-            quotePrice: latestQuote,
-            confidence: 0,
-            publishTime: Math.floor(Date.now() / 1000),
+            price: ratio,
+            basePrice: base.price,
+            quotePrice: quote.price,
+            confidence: base.confidence + quote.confidence,
+            publishTime: Math.min(base.publishTime, quote.publishTime),
           });
           setLoading(false);
           setConnected(true);
         }
       };
 
-      priceStream.onerror = () => setConnected(false);
+      // If the connection drops, mark it disconnected (we could reconnect
+      eventSource.onerror = () => setConnected(false);
     }
 
     startStream();
 
     return () => {
-      stopped = true;
-      priceStream?.close();
+      cancelled = true;
+      eventSource?.close();
       setConnected(false);
     };
   }, [marketSymbol]);
-
   return { priceData, loading, connected };
 }

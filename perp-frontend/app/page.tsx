@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import { ChevronDown, Copy, LogOut } from "lucide-react";
@@ -12,12 +12,11 @@ import { usePythPrice } from "@/hooks/usePythPrice";
 import { useTradeHistory } from "@/hooks/useTradeHistory";
 import { useUserCollateral } from "@/hooks/useUserCollateral";
 import {
-  formatAmount,
   formatBps,
   lamportsToToken,
   shortenAddress,
 } from "@/lib/format";
-import { MARKET_LABELS, type MarketSymbol } from "@/lib/constants";
+import { MARKET_LABELS, MARKET_SYMBOLS, type MarketSymbol } from "@/lib/constants";
 import AdminPanel from "./components/AdminPanel";
 import PerpChart, { type ChartTimeframe } from "./components/PerpChart";
 import PositionsDock from "./components/PositionsDock";
@@ -74,12 +73,13 @@ function beginPointerResize(
 
 export default function Home() {
   const [timeframe, setTimeframe] = useState<ChartTimeframe>("15m");
-  const [selectedMarket] = useState<MarketSymbol>("SOLHYPE");
+  const [selectedMarket, setSelectedMarket] = useState<MarketSymbol>("SOLHYPE");
   const [activeView, setActiveView] = useState<AppView>("trade");
   const [ticketWidth, setTicketWidth] = useState(360);
   const [dockHeight, setDockHeight] = useState(240);
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const [solBalance, setSolBalance] = useState(0);
+  const [change24h, setChange24h] = useState<number | null>(null);
 
   const { connection } = useConnection();
   const { publicKey, disconnect } = useWallet();
@@ -97,33 +97,82 @@ export default function Home() {
 
   
   const price = priceData?.price ?? 0;
-  const displayPrice = price > 0 ? price : 0.04166;
-  const openInterest = market
-    ? lamportsToToken(market.openInterestLong.add(market.openInterestShort))
-    : 0;
+  const displayPrice = price;
+  const oiLong = market ? lamportsToToken(market.openInterestLong) : 0;
+  const oiShort = market ? lamportsToToken(market.openInterestShort) : 0;
+  const openInterest = oiLong + oiShort;
   const poolBalance = market ? lamportsToToken(market.poolBalance) : 0;
   const feeText = formatBps(
     market ? market.tradingFeesBps.toNumber() : DEFAULT_TRADING_FEE_BPS,
   );
   const marketPair = MARKET_LABELS[selectedMarket];
   const marketDash = marketPair.replace("/", "-");
+  const [baseAsset, quoteAsset] = marketPair.split("/");
   const availableBalance = lamportsToToken(availableAmount);
   const isConfiguredAdmin =
     Boolean(CONFIGURED_ADMIN_WALLET) &&
     publicKey?.toBase58() === CONFIGURED_ADMIN_WALLET;
   const poolUtilization =
     poolBalance > 0 ? Math.min(999, (openInterest / poolBalance) * 100) : 0;
-  const chartReadout = useMemo(() => {
-    const range =
-      timeframe === "5m" ? 0.0035 : timeframe === "15m" ? 0.0075 : 0.016;
-    return {
-      open: displayPrice * (1 - range * 0.45),
-      high: displayPrice * (1 + range),
-      low: displayPrice * (1 - range),
-      close: displayPrice,
-    };
-  }, [displayPrice, timeframe]);
+  // Funding proxy derived from real open-interest skew (longs vs shorts).
+  const fundingRate =
+    openInterest > 0 ? ((oiLong - oiShort) / openInterest) * 0.05 : 0;
   const isProgramMissing = marketError === "Program not deployed on devnet";
+  const marketStats = [
+    { label: "Ratio", value: displayPrice.toFixed(6) },
+    {
+      label: "24H",
+      value:
+        change24h === null
+          ? "-"
+          : `${change24h >= 0 ? "+" : ""}${change24h.toFixed(2)}%`,
+      className:
+        change24h === null ? "" : change24h >= 0 ? "positive" : "negative",
+    },
+    {
+      label: "Funding / HR",
+      value: `${fundingRate >= 0 ? "+" : ""}${fundingRate.toFixed(4)}%`,
+      className: fundingRate >= 0 ? "" : "negative",
+    },
+    { label: "Open Interest", value: `${openInterest.toFixed(0)} USDC` },
+    {
+      label: "Pool Util",
+      value: `${poolUtilization.toFixed(1)}%`,
+      className: poolUtilization > 75 ? "negative" : "",
+    },
+    { label: "Trading Fee", value: feeText },
+    { label: "Pool Balance", value: `${poolBalance.toFixed(2)} USDC` },
+  ];
+
+  useEffect(() => {
+    const abort = new AbortController();
+    const BENCH = "https://benchmarks.pyth.network/v1/shims/tradingview/history";
+    async function load24h() {
+      try {
+        const to = Math.floor(Date.now() / 1000);
+        const from = to - 25 * 3600;
+        const q = `resolution=60&from=${from}&to=${to}`;
+        const [baseRes, quoteRes] = await Promise.all([
+          fetch(`${BENCH}?symbol=${encodeURIComponent(`Crypto.${baseAsset}/USD`)}&${q}`, { signal: abort.signal }),
+          fetch(`${BENCH}?symbol=${encodeURIComponent(`Crypto.${quoteAsset}/USD`)}&${q}`, { signal: abort.signal }),
+        ]);
+        const base = await baseRes.json();
+        const quote = await quoteRes.json();
+        if (base.s !== "ok" || quote.s !== "ok" || !base.c?.length || !quote.c?.length) return;
+        const ratioThen = base.c[0] / quote.c[0];
+        const ratioNow = base.c[base.c.length - 1] / quote.c[quote.c.length - 1];
+        if (ratioThen > 0) setChange24h((ratioNow / ratioThen - 1) * 100);
+      } catch {
+        /* keep last value on failure */
+      }
+    }
+    load24h();
+    const interval = setInterval(load24h, 60_000);
+    return () => {
+      abort.abort();
+      clearInterval(interval);
+    };
+  }, [baseAsset, quoteAsset]);
 
   useEffect(() => {
     if (!publicKey) return;
@@ -265,47 +314,32 @@ export default function Home() {
           <>
             <section className="market-strip" aria-label="Selected market">
           <div className="market-title">
-            <button className="market-select" type="button">
-              {marketDash}
-              <ChevronDown size={13} />
-            </button>
+            <select
+              className="market-select"
+              value={selectedMarket}
+              onChange={(event) =>
+                setSelectedMarket(event.target.value as MarketSymbol)
+              }
+            >
+              {MARKET_SYMBOLS.map((symbol) => (
+                <option key={symbol} value={symbol}>
+                  {MARKET_LABELS[symbol].replace("/", "-")}
+                </option>
+              ))}
+            </select>
             <div className="market-pair">
               <span>Ratio perpetual</span>
-              <strong>SOL/USD ÷ HYPE/USD</strong>
+              <strong>{baseAsset}/USD ÷ {quoteAsset}/USD</strong>
             </div>
           </div>
 
           <div className="market-stat-grid">
-            <div>
-              <span>Ratio</span>
-              <strong>{displayPrice.toFixed(6)}</strong>
-            </div>
-            <div>
-              <span>24H</span>
-              <strong className="positive">+0.13%</strong>
-            </div>
-            <div>
-              <span>Funding / HR</span>
-              <strong>0.0500%</strong>
-            </div>
-            <div>
-              <span>Open Interest</span>
-              <strong>{openInterest.toFixed(0)} USDC</strong>
-            </div>
-            <div>
-              <span>Pool Util</span>
-              <strong className={poolUtilization > 75 ? "negative" : ""}>
-                {poolUtilization.toFixed(1)}%
-              </strong>
-            </div>
-            <div>
-              <span>Trading Fee</span>
-              <strong>{feeText}</strong>
-            </div>
-            <div>
-              <span>Pool Balance</span>
-              <strong>{poolBalance.toFixed(2)} USDC</strong>
-            </div>
+            {marketStats.map((stat) => (
+              <div key={stat.label}>
+                <span>{stat.label}</span>
+                <strong className={stat.className}>{stat.value}</strong>
+              </div>
+            ))}
           </div>
 
           <div className="market-pyth-prices">
@@ -328,8 +362,8 @@ export default function Home() {
               {isProgramMissing
                 ? "Deploy the Anchor program to devnet or update the frontend PROGRAM_ID to the deployed program."
                 : isConfiguredAdmin
-                  ? "Initialize the SOL/HYPE market from the admin setup panel below."
-                  : "The SOL/HYPE market is not initialized yet. Ask the configured admin wallet to initialize it."}
+                  ? `Initialize the ${marketPair} market from the admin setup panel below.`
+                  : `The ${marketPair} market is not initialized yet. Ask the configured admin wallet to initialize it.`}
             </strong>
           </div>
         ) : null}
@@ -379,12 +413,6 @@ export default function Home() {
                   <span>
                     {marketPair} · {timeframe} · Nyxora
                   </span>
-                  <strong>
-                    O {formatAmount(chartReadout.open)} H{" "}
-                    {formatAmount(chartReadout.high)} L{" "}
-                    {formatAmount(chartReadout.low)} C{" "}
-                    {formatAmount(chartReadout.close)}
-                  </strong>
                 </div>
               </div>
               <PerpChart
@@ -463,6 +491,7 @@ export default function Home() {
             availableBalance={availableBalance}
             poolUtilization={poolUtilization}
             onTrade={() => setActiveView("trade")}
+            onUpdate={handleUpdate}
           />
         ) : (
           <ProfilePage

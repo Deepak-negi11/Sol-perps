@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { AnchorProvider, Program } from "@coral-xyz/anchor";
+import { AnchorProvider, Program, type Idl } from "@coral-xyz/anchor";
 import {
   PublicKey,
   type Transaction,
@@ -32,7 +32,7 @@ export function useProgram(): SolperpProgram | null {
     );
 
     
-    return new Program(idl as any, provider) as unknown as SolperpProgram;
+    return new Program(idl as Idl, provider) as unknown as SolperpProgram;
   }, [connection, wallet.publicKey, wallet.signTransaction, wallet.signAllTransactions]);
 }
 
@@ -51,6 +51,6 @@ export function useReadonlyProgram(): SolperpProgram {
     };
     const provider = new AnchorProvider(connection, readonlyWallet, { commitment: "confirmed" });
     
-    return new Program(idl as any, provider) as unknown as SolperpProgram;
+    return new Program(idl as Idl, provider) as unknown as SolperpProgram;
   }, [connection]);
 }

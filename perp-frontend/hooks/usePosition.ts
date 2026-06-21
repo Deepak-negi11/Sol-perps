@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { Program, AnchorProvider, BN } from "@coral-xyz/anchor";
+import { Program, AnchorProvider, BN, type Idl } from "@coral-xyz/anchor";
 import idl from "@/lib/idl/solperp_anchor.json";
 import {
   PublicKey,
@@ -26,6 +26,17 @@ export interface PositionData {
   isOpen: boolean;
   bump: number;
 }
+
+type PositionAccountClient = {
+  position: {
+    all: (filters: unknown[]) => Promise<
+      Array<{
+        publicKey: PublicKey;
+        account: Omit<PositionData, "publicKey">;
+      }>
+    >;
+  };
+};
 
 export function usePosition(marketSymbol: MarketSymbol = "SOLHYPE") {
   const { connection } = useConnection();
@@ -57,11 +68,12 @@ export function usePosition(marketSymbol: MarketSymbol = "SOLHYPE") {
         commitment: "confirmed",
       });
       
-      const program = new Program(idl as any, provider);
+      const program = new Program(idl as Idl, provider);
+      const positionAccount = program.account as unknown as PositionAccountClient;
       const marketAddress = getMarketPda(marketSymbol);
 
       
-      const positionAccounts = await (program.account as any).position.all([
+      const positionAccounts = await positionAccount.position.all([
         {
           memcmp: {
             offset: 8,
@@ -100,8 +112,7 @@ export function usePosition(marketSymbol: MarketSymbol = "SOLHYPE") {
   }, [connection, marketSymbol, publicKey]);
 
   useEffect(() => {
-    
-    fetchPosition();
+    void Promise.resolve().then(fetchPosition);
 
     if (!publicKey) return;
     const marketAddress = getMarketPda(marketSymbol);
