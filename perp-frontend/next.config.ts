@@ -4,6 +4,7 @@ const pythJitoShim = "./lib/shims/pyth-jito.ts";
 const jitoTypesShim = "./lib/shims/jito-types.ts";
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: ["127.0.0.1"],
   turbopack: {
     root: __dirname,
     resolveAlias: {

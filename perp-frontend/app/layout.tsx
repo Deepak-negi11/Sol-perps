@@ -3,6 +3,7 @@ import { Inter, Roboto_Mono } from "next/font/google";
 import "./globals.css";
 import "./shear-terminal.css";
 import "./shear-polish.css";
+import "./nyxora.css";
 import WalletContextProvider from "./components/WalletContextProvider";
 import { ToastProvider } from "./components/Toast";
 
@@ -17,8 +18,8 @@ const robotoMono = Roboto_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Satr Trading Terminal",
-  description: "Advanced Decentralized Perpetual Trading Terminal on Solana",
+  title: "Nyxora Trading Terminal",
+  description: "Ratio perpetual trading terminal on Solana devnet",
 };
 
 export default function RootLayout({

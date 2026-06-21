@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useProgram } from "@/hooks/useProgram";
 import { MarketData } from "@/hooks/useMarket";
@@ -56,13 +56,6 @@ export default function AdminPanel({
 
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [liquidityAmount, setLiquidityAmount] = useState("");
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setInitBaseFeed(MARKET_BASE_FEED_IDS[marketSymbol]);
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setInitQuoteFeed(MARKET_QUOTE_FEED_IDS[marketSymbol]);
-  }, [marketSymbol]);
 
   if (loading) return null;
 

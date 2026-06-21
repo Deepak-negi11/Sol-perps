@@ -17,13 +17,16 @@ import {
   type KLineData,
   type Styles,
 } from "klinecharts";
-import { MARKET_BASE_FEED_IDS, MARKET_QUOTE_FEED_IDS } from "@/lib/constants";
-import { type TerminalMarket } from "./MarketRail";
+import {
+  MARKET_BASE_FEED_IDS,
+  MARKET_QUOTE_FEED_IDS,
+  type MarketSymbol,
+} from "@/lib/constants";
 
 interface PerpChartProps {
   price: number;
   timeframe: ChartTimeframe;
-  market: TerminalMarket;
+  market: MarketSymbol;
 }
 
 export type ChartTimeframe = "5m" | "15m" | "1h";
@@ -385,11 +388,16 @@ export default function PerpChart({ price, timeframe, market }: PerpChartProps) 
   const chartRef = useRef<Chart | null>(null);
   const candlesRef = useRef<KLineData[]>([]);
   const loadedKeyRef = useRef("");
+  const priceRef = useRef(price);
   const [activeIndicators, setActiveIndicators] = useState<string[]>(["EMA", "VOL"]);
   const [activeTool, setActiveTool] = useState<string | null>(null);
   const [status, setStatus] = useState("Loading ratio candles…");
 
   const marketKey = useMemo(() => `${market}-${timeframe}`, [market, timeframe]);
+
+  useEffect(() => {
+    priceRef.current = price;
+  }, [price]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -439,7 +447,7 @@ export default function PerpChart({ price, timeframe, market }: PerpChartProps) 
 
         const candles = buildRatioCandles(base, quote);
         if (!candles.length) {
-          const fallbackCandles = buildFallbackCandles(timeframe, price);
+          const fallbackCandles = buildFallbackCandles(timeframe, priceRef.current);
           candlesRef.current = fallbackCandles;
           loadedKeyRef.current = marketKey;
           applyCandles(chartRef.current, fallbackCandles);
@@ -451,21 +459,20 @@ export default function PerpChart({ price, timeframe, market }: PerpChartProps) 
         loadedKeyRef.current = marketKey;
         applyCandles(chartRef.current, candles);
         setStatus(`${candles.length} real SOL/HYPE candles`);
-      } catch (error) {
+      } catch {
         if (!abort.signal.aborted) {
-          const fallbackCandles = buildFallbackCandles(timeframe, price);
+          const fallbackCandles = buildFallbackCandles(timeframe, priceRef.current);
           candlesRef.current = fallbackCandles;
           loadedKeyRef.current = marketKey;
           applyCandles(chartRef.current, fallbackCandles);
           setStatus("Preview candles while Pyth history loads");
-          console.warn("Failed to load ratio history from Pyth Benchmarks", error);
         }
       }
     }
 
     load();
     return () => abort.abort();
-  }, [market, marketKey, price, timeframe]);
+  }, [market, marketKey, timeframe]);
 
   useEffect(() => {
     const chart = chartRef.current;
@@ -544,7 +551,20 @@ export default function PerpChart({ price, timeframe, market }: PerpChartProps) 
   }, []);
 
   const resetView = useCallback(() => {
-    chartRef.current?.scrollToRealTime(120);
+    const chart = chartRef.current;
+    if (!chart) return;
+    chart.setBarSpace(8);
+    chart.scrollToRealTime(120);
+  }, []);
+
+  const toggleFullscreen = useCallback(() => {
+    const stage = containerRef.current?.parentElement;
+    if (!stage) return;
+    if (document.fullscreenElement) {
+      void document.exitFullscreen();
+    } else {
+      void stage.requestFullscreen();
+    }
   }, []);
 
   const clearDrawings = useCallback(() => {
@@ -601,7 +621,7 @@ export default function PerpChart({ price, timeframe, market }: PerpChartProps) 
         <button aria-label="Return to latest candle" onClick={resetView} type="button">
           <MoveDiagonal size={15} />
         </button>
-        <button aria-label="Reset chart view" onClick={resetView} type="button">
+        <button aria-label="Toggle fullscreen" onClick={toggleFullscreen} type="button">
           <Maximize2 size={15} />
         </button>
       </div>

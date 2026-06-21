@@ -1,21 +1,33 @@
 "use client";
 
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
-import { ChevronDown, Wifi, X } from "lucide-react";
+import { ChevronDown, Copy, LogOut } from "lucide-react";
+import { LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useMarket } from "@/hooks/useMarket";
 import { usePosition } from "@/hooks/usePosition";
 import { usePythPrice } from "@/hooks/usePythPrice";
+import { useTradeHistory } from "@/hooks/useTradeHistory";
 import { useUserCollateral } from "@/hooks/useUserCollateral";
-import { formatAmount, formatBps, lamportsToToken } from "@/lib/format";
+import {
+  formatAmount,
+  formatBps,
+  lamportsToToken,
+  shortenAddress,
+} from "@/lib/format";
 import { MARKET_LABELS, type MarketSymbol } from "@/lib/constants";
 import AdminPanel from "./components/AdminPanel";
 import PerpChart, { type ChartTimeframe } from "./components/PerpChart";
 import PositionsDock from "./components/PositionsDock";
 import TradeTicket from "./components/TradeTicket";
-import CollateralPanel from "./components/CollateralPanel";
 import OnChainActivity from "./components/OnChainActivity";
+import {
+  PoolPage,
+  PositionsPage,
+  ProfilePage,
+} from "./components/NyxoraPages";
 
 const WalletMultiButton = dynamic(
   async () =>
@@ -25,6 +37,14 @@ const WalletMultiButton = dynamic(
 
 const TIMEFRAMES: ChartTimeframe[] = ["5m", "15m", "1h"];
 const DEFAULT_TRADING_FEE_BPS = 10;
+const CONFIGURED_ADMIN_WALLET = process.env.NEXT_PUBLIC_ADMIN_WALLET?.trim();
+type AppView = "trade" | "positions" | "pool" | "profile";
+const NAV_ITEMS: { id: AppView; label: string }[] = [
+  { id: "trade", label: "Trade" },
+  { id: "positions", label: "Positions" },
+  { id: "pool", label: "Pool" },
+  { id: "profile", label: "Profile" },
+];
 
 function beginPointerResize(
   event: React.PointerEvent,
@@ -55,11 +75,15 @@ function beginPointerResize(
 export default function Home() {
   const [timeframe, setTimeframe] = useState<ChartTimeframe>("15m");
   const [selectedMarket] = useState<MarketSymbol>("SOLHYPE");
+  const [activeView, setActiveView] = useState<AppView>("trade");
   const [ticketWidth, setTicketWidth] = useState(360);
   const [dockHeight, setDockHeight] = useState(240);
-  const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
+  const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
+  const [solBalance, setSolBalance] = useState(0);
 
-  const { priceData, connected } = usePythPrice(selectedMarket);
+  const { connection } = useConnection();
+  const { publicKey, disconnect } = useWallet();
+  const { priceData } = usePythPrice(selectedMarket);
   const {
     market,
     loading: marketLoading,
@@ -68,7 +92,8 @@ export default function Home() {
   } = useMarket(selectedMarket);
   const { refetch: refetchCollateral, availableAmount } =
     useUserCollateral(selectedMarket);
-  const { refetch: refetchPosition } = usePosition(selectedMarket);
+  const { positions, refetch: refetchPosition } = usePosition(selectedMarket);
+  const { history, refetch: refetchHistory } = useTradeHistory();
 
   // The "price" here is the SOL/HYPE ratio (unitless), not a dollar value.
   const price = priceData?.price ?? 0;
@@ -83,6 +108,9 @@ export default function Home() {
   const marketPair = MARKET_LABELS[selectedMarket];
   const marketDash = marketPair.replace("/", "-");
   const availableBalance = lamportsToToken(availableAmount);
+  const isConfiguredAdmin =
+    Boolean(CONFIGURED_ADMIN_WALLET) &&
+    publicKey?.toBase58() === CONFIGURED_ADMIN_WALLET;
   const poolUtilization =
     poolBalance > 0 ? Math.min(999, (openInterest / poolBalance) * 100) : 0;
   const chartReadout = useMemo(() => {
@@ -97,10 +125,40 @@ export default function Home() {
   }, [displayPrice, timeframe]);
   const isProgramMissing = marketError === "Program not deployed on devnet";
 
+  useEffect(() => {
+    if (!publicKey) return;
+
+    let cancelled = false;
+    connection
+      .getBalance(publicKey, "confirmed")
+      .then((lamports) => {
+        if (!cancelled) setSolBalance(lamports / LAMPORTS_PER_SOL);
+      })
+      .catch(() => {
+        if (!cancelled) setSolBalance(0);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [connection, publicKey]);
+
   const handleUpdate = () => {
     refetchMarket();
     refetchCollateral();
     refetchPosition();
+    refetchHistory();
+  };
+
+  const handleCopyAddress = async () => {
+    if (!publicKey) return;
+    await navigator.clipboard?.writeText(publicKey.toBase58());
+    setIsAccountMenuOpen(false);
+  };
+
+  const handleDisconnect = async () => {
+    setIsAccountMenuOpen(false);
+    await disconnect();
   };
 
   const startResize = useCallback(
@@ -122,48 +180,90 @@ export default function Home() {
           <div className="brand-lockup">
             <div className="brand-mark">
               <Image
-                src="/satr-planet-header.png"
-                alt=""
-                width={736}
-                height={552}
+                src="/nyxora-star-logo.jpg"
+                alt="Nyxora"
+                width={1024}
+                height={1024}
                 priority
               />
             </div>
-            <strong>Satr</strong>
+            <strong>Nyxora</strong>
           </div>
 
           <nav className="terminal-nav" aria-label="Primary">
-            <button className="active">Trade</button>
-            <button>Positions</button>
-            <button>Pool</button>
-            <button>Profile</button>
+            {NAV_ITEMS.map((item) => (
+              <button
+                key={item.id}
+                className={activeView === item.id ? "active" : ""}
+                onClick={() => setActiveView(item.id)}
+              >
+                {item.label}
+              </button>
+            ))}
           </nav>
         </div>
 
         <div className="terminal-actions">
-          <span
-            className="network-chip"
-            style={{
-              color: connected
-                ? "var(--long-green)"
-                : "var(--warning-amber)",
-            }}
-          >
-            <Wifi size={14} />
-            {connected ? "Oracle live" : "Connecting"}
-          </span>
-          <button
-            className="balance-chip"
-            onClick={() => setIsDepositModalOpen(true)}
-          >
-            {availableBalance.toFixed(2)} USDC
-          </button>
-          <WalletMultiButton className="wallet-btn" />
+          {publicKey ? (
+            <div className="account-menu-wrap">
+              <button
+                className="balance-chip account-trigger"
+                onClick={() => setIsAccountMenuOpen((open) => !open)}
+              >
+                <span className="wallet-status-dot" />
+                {availableBalance.toFixed(2)} USDC
+                <span className="trigger-divider" />
+                {shortenAddress(publicKey.toBase58(), 4)}
+                <ChevronDown size={13} />
+              </button>
+              {isAccountMenuOpen ? (
+                <div className="account-dropdown">
+                  <div className="account-dropdown-head">
+                    <span>ON-CHAIN · DEVNET</span>
+                    <div className="account-logo">
+                      <Image
+                        src="/nyxora-star-logo.jpg"
+                        alt=""
+                        width={1024}
+                        height={1024}
+                      />
+                    </div>
+                  </div>
+                  <div className="account-dropdown-row">
+                    <span>USDC</span>
+                    <strong>{availableBalance.toFixed(2)}</strong>
+                  </div>
+                  <div className="account-dropdown-row">
+                    <span>SOL</span>
+                    <strong>{solBalance.toFixed(4)}</strong>
+                  </div>
+                  <button
+                    className="account-dropdown-action"
+                    onClick={handleCopyAddress}
+                  >
+                    <Copy size={16} />
+                    Copy address
+                  </button>
+                  <button
+                    className="account-dropdown-action disconnect-action"
+                    onClick={handleDisconnect}
+                  >
+                    <LogOut size={16} />
+                    Disconnect
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <WalletMultiButton className="wallet-btn" />
+          )}
         </div>
       </header>
 
       <main className="terminal-main">
-        <section className="market-strip" aria-label="Selected market">
+        {activeView === "trade" ? (
+          <>
+            <section className="market-strip" aria-label="Selected market">
           <div className="market-title">
             <button className="market-select" type="button">
               {marketDash}
@@ -227,12 +327,14 @@ export default function Home() {
             <strong>
               {isProgramMissing
                 ? "Deploy the Anchor program to devnet or update the frontend PROGRAM_ID to the deployed program."
-                : "Connect the admin wallet and initialize the SOL/HYPE market from the Admin Console below."}
+                : isConfiguredAdmin
+                  ? "Initialize the SOL/HYPE market from the admin setup panel below."
+                  : "The SOL/HYPE market is not initialized yet. Ask the configured admin wallet to initialize it."}
             </strong>
           </div>
         ) : null}
 
-        {!market && !isProgramMissing ? (
+        {!market && !isProgramMissing && isConfiguredAdmin ? (
           <div className="setup-inline-panel">
             <AdminPanel
               market={market}
@@ -275,7 +377,7 @@ export default function Home() {
                 </div>
                 <div className="chart-readout">
                   <span>
-                    {marketPair} · {timeframe} · Satr
+                    {marketPair} · {timeframe} · Nyxora
                   </span>
                   <strong>
                     O {formatAmount(chartReadout.open)} H{" "}
@@ -333,32 +435,51 @@ export default function Home() {
             <OnChainActivity market={market} marketSymbol={selectedMarket} />
           </aside>
         </div>
+          </>
+        ) : activeView === "positions" ? (
+          <PositionsPage
+            market={market}
+            marketSymbol={selectedMarket}
+            positions={positions}
+            history={history}
+            publicKey={publicKey}
+            price={displayPrice}
+            openInterest={openInterest}
+            poolBalance={poolBalance}
+            availableBalance={availableBalance}
+            poolUtilization={poolUtilization}
+            onTrade={() => setActiveView("trade")}
+          />
+        ) : activeView === "pool" ? (
+          <PoolPage
+            market={market}
+            marketSymbol={selectedMarket}
+            positions={positions}
+            history={history}
+            publicKey={publicKey}
+            price={displayPrice}
+            openInterest={openInterest}
+            poolBalance={poolBalance}
+            availableBalance={availableBalance}
+            poolUtilization={poolUtilization}
+            onTrade={() => setActiveView("trade")}
+          />
+        ) : (
+          <ProfilePage
+            market={market}
+            marketSymbol={selectedMarket}
+            positions={positions}
+            history={history}
+            publicKey={publicKey}
+            price={displayPrice}
+            openInterest={openInterest}
+            poolBalance={poolBalance}
+            availableBalance={availableBalance}
+            poolUtilization={poolUtilization}
+            onTrade={() => setActiveView("trade")}
+          />
+        )}
       </main>
-
-      {isDepositModalOpen && (
-        <div className="modal-backdrop" onClick={() => setIsDepositModalOpen(false)}>
-          <div className="modal-container" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>Manage Collateral</h3>
-              <button
-                className="modal-close-btn"
-                onClick={() => setIsDepositModalOpen(false)}
-                aria-label="Close modal"
-              >
-                <X size={18} />
-              </button>
-            </div>
-            <div className="modal-body">
-              <CollateralPanel
-                market={market}
-                marketSymbol={selectedMarket}
-                onUpdate={handleUpdate}
-                onDepositSuccess={() => setIsDepositModalOpen(false)}
-              />
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

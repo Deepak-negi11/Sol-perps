@@ -1,0 +1,50 @@
+/* Nyxora Custom Styling Overrides */
+
+.brand-lockup > strong {
+  font-family: var(--font-ui-mono), "Roboto Mono", monospace !important;
+  font-weight: 400 !important; /* Thinner monospace font weight */
+  font-size: 1.05rem !important; /* Decreased size */
+  letter-spacing: 0.08em !important; /* Clean monospaced spacing */
+  text-transform: uppercase !important; /* Uppercase matching terminal style */
+  color: #f1f4f8 !important;
+  transform: none !important;
+}
+
+.brand-mark {
+  width: 26px !important;
+  height: 26px !important;
+  border-radius: 4px !important;
+  overflow: hidden;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: transparent !important;
+}
+
+.account-logo {
+  width: 26px !important;
+  height: 26px !important;
+  border-radius: 4px !important;
+  overflow: hidden;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: transparent !important;
+}
+
+
+.brand-lockup {
+  gap: 8px !important;
+}
+
+/* Responsive Table Layout overrides to prevent horizontal scrollbars on desktop viewports */
+.positions-grid-table {
+  min-width: 800px !important;
+}
+
+.history-grid-table {
+  min-width: 800px !important;
+}
+
+
+

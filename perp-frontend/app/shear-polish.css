@@ -5,7 +5,7 @@
 .connect-state .wallet-adapter-button.wallet-btn {
   width: 100%;
   height: 42px !important;
-  background: var(--accent-blue) !important;
+  background: #9c1f33 !important;
   background-image: none !important;
   color: #fff !important;
   border: none !important;
@@ -119,10 +119,6 @@
   50% {
     opacity: 0.35;
   }
-}
-
-.network-chip svg {
-  animation: shear-pulse-dot 2s ease-in-out infinite;
 }
 
 .history-tx-link {

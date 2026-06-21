@@ -199,14 +199,14 @@ export default function PositionsDock({
               <div className="positions-table-wrapper">
                 <table className="positions-grid-table">
                   <colgroup>
-                    <col style={{ width: "150px" }} />
-                    <col style={{ width: "170px" }} />
-                    <col style={{ width: "130px" }} />
-                    <col style={{ width: "130px" }} />
-                    <col style={{ width: "130px" }} />
-                    <col style={{ width: "130px" }} />
-                    <col style={{ width: "200px" }} />
-                    <col style={{ width: "110px" }} />
+                    <col style={{ width: "13%" }} />
+                    <col style={{ width: "15%" }} />
+                    <col style={{ width: "11%" }} />
+                    <col style={{ width: "11%" }} />
+                    <col style={{ width: "11%" }} />
+                    <col style={{ width: "11%" }} />
+                    <col style={{ width: "18%" }} />
+                    <col style={{ width: "10%" }} />
                   </colgroup>
                   <thead>
                     <tr>

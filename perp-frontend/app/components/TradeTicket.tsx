@@ -288,11 +288,6 @@ export default function TradeTicket({
         </div>
       ) : null}
 
-      <div className="ticket-row compact">
-        <button className="ticket-pill active">Cross</button>
-        <button className="ticket-pill">{activeLeverage}x</button>
-      </div>
-
       <div className="side-switch">
         <button
           className={side === "long" ? "active long" : ""}
@@ -307,10 +302,7 @@ export default function TradeTicket({
           Sell / Short
         </button>
       </div>
-      <p className="ticket-side-note">
-        Profit if {marketPair.split("/")[0]} {side === "long" ? "outperforms" : "underperforms"}{" "}
-        {marketPair.split("/")[1]} regardless of market direction.
-      </p>
+
 
       <div className="mode-switch">
         <button
