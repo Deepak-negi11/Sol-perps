@@ -382,7 +382,10 @@ export default function Home() {
         <div
           className="terminal-workspace"
           style={
-            { "--ticket-width": `${ticketWidth}px` } as React.CSSProperties
+            {
+              "--ticket-width": `${ticketWidth}px`,
+              "--dock-height": `${dockHeight}px`,
+            } as React.CSSProperties
           }
         >
           <section
