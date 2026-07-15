@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import {
+  DEFAULT_MARKET,
   MARKET_BASE_FEED_IDS,
   MARKET_QUOTE_FEED_IDS,
   type MarketSymbol,
@@ -29,7 +30,7 @@ function readPythPrice(parsedPrice: {
   };
 }
 
-export function usePythPrice(marketSymbol: MarketSymbol = "SOLHYPE") {
+export function usePythPrice(marketSymbol: MarketSymbol = DEFAULT_MARKET) {
   const [priceData, setPriceData] = useState<PythPriceData | null>(null);
   const [loading, setLoading] = useState(true);
   const [connected, setConnected] = useState(false);

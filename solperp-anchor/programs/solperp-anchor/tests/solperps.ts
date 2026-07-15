@@ -25,6 +25,19 @@ describe("solperp-lab", () => {
   let marketPda: anchor.web3.PublicKey;
   const wallet = provider.wallet as any;
 
+  const priceFeedId = Array.from(
+    Buffer.from(
+      "ef0d8b6fda2ceba41da15d4095d1da392a0d2f8ed0c6c7bc0f4cfac8c280b50d",
+      "hex"
+    )
+  );
+  const quoteFeedId = Array.from(
+    Buffer.from(
+      "eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a",
+      "hex"
+    )
+  );
+
   before(async () => {
     // 1. Create collateral mint
     collateralMint = await createMint(
@@ -54,7 +67,7 @@ describe("solperp-lab", () => {
 
     // 3. Derive PDAs
     [marketPda] = anchor.web3.PublicKey.findProgramAddressSync(
-      [Buffer.from("market")],
+      [Buffer.from("market"), Buffer.from(priceFeedId), Buffer.from(quoteFeedId)],
       program.programId
     );
 
@@ -81,25 +94,20 @@ describe("solperp-lab", () => {
 
   it("Initialize SOL-PERP market", async () => {
     const [, marketBump] = anchor.web3.PublicKey.findProgramAddressSync(
-      [Buffer.from("market")],
+      [Buffer.from("market"), Buffer.from(priceFeedId), Buffer.from(quoteFeedId)],
       program.programId
     );
     const maxLeverage = new anchor.BN(100);
     const liquidationThresholdBps = new anchor.BN(500);
     const tradingFeesBps = new anchor.BN(10);
 
-    const priceFeedId = Array.from(
-      Buffer.from(
-        "ef0d8b6fda2ceba41da15d4095d1da392a0d2f8ed0c6c7bc0f4cfac8c280b50d",
-        "hex"
-      )
-    );
     await program.methods
       .initializeMarket(
         maxLeverage,
         liquidationThresholdBps,
         tradingFeesBps,
-        priceFeedId
+        priceFeedId,
+        quoteFeedId
       )
       .accounts({
         admin: provider.publicKey,
@@ -238,6 +246,9 @@ describe("solperp-lab", () => {
         priceUpdate: new anchor.web3.PublicKey(
           "BGFoj6U2hdVMms3sggreHtQfW7GCF5TeqxNLiKT6iBxc"
         ),
+        quotePriceUpdate: new anchor.web3.PublicKey(
+          "33uBBYZwcKenxnRcn9tcH1hLWNsTfLJTJFvMJUvKqehY"
+        ),
         userCollateral: userCollateralPda,
         position: positionPda,
         user: wallet.publicKey,
@@ -298,6 +309,9 @@ describe("solperp-lab", () => {
         position: positionPda,
         priceUpdate: new anchor.web3.PublicKey(
           "C11dmJTHfjc3AizfTBpnU3DaPvFfywbEZpnN2dKPbU6r"
+        ),
+        quotePriceUpdate: new anchor.web3.PublicKey(
+          "44uBBYZwcKenxnRcn9tcH1hLWNsTfLJTJFvMJUvKqehY"
         ),
         user: wallet.publicKey,
       })
@@ -366,6 +380,9 @@ describe("solperp-lab", () => {
         priceUpdate: new anchor.web3.PublicKey(
           "BGFoj6U2hdVMms3sggreHtQfW7GCF5TeqxNLiKT6iBxc"
         ),
+        quotePriceUpdate: new anchor.web3.PublicKey(
+          "33uBBYZwcKenxnRcn9tcH1hLWNsTfLJTJFvMJUvKqehY"
+        ),
         userCollateral: userCollateralPda,
         position: positionPda,
         user: wallet.publicKey,
@@ -380,6 +397,9 @@ describe("solperp-lab", () => {
         position: positionPda,
         priceUpdate: new anchor.web3.PublicKey(
           "22uBBYZwcKenxnRcn9tcH1hLWNsTfLJTJFvMJUvKqehY"
+        ),
+        quotePriceUpdate: new anchor.web3.PublicKey(
+          "55uBBYZwcKenxnRcn9tcH1hLWNsTfLJTJFvMJUvKqehY"
         ),
         liquidator: wallet.publicKey,
       })
@@ -442,6 +462,9 @@ describe("solperp-lab", () => {
           market: marketPda,
           priceUpdate: new anchor.web3.PublicKey(
             "BGFoj6U2hdVMms3sggreHtQfW7GCF5TeqxNLiKT6iBxc"
+          ),
+          quotePriceUpdate: new anchor.web3.PublicKey(
+            "33uBBYZwcKenxnRcn9tcH1hLWNsTfLJTJFvMJUvKqehY"
           ),
           userCollateral: userCollateralPda,
           position: positionPda,
@@ -512,6 +535,9 @@ describe("solperp-lab", () => {
           market: marketPda,
           priceUpdate: new anchor.web3.PublicKey(
             "BGFoj6U2hdVMms3sggreHtQfW7GCF5TeqxNLiKT6iBxc"
+          ),
+          quotePriceUpdate: new anchor.web3.PublicKey(
+            "33uBBYZwcKenxnRcn9tcH1hLWNsTfLJTJFvMJUvKqehY"
           ),
           userCollateral: userCollateralPda,
           position: positionPda,
@@ -911,6 +937,9 @@ describe("solperp-lab", () => {
         priceUpdate: new anchor.web3.PublicKey(
           "BGFoj6U2hdVMms3sggreHtQfW7GCF5TeqxNLiKT6iBxc"
         ),
+        quotePriceUpdate: new anchor.web3.PublicKey(
+          "33uBBYZwcKenxnRcn9tcH1hLWNsTfLJTJFvMJUvKqehY"
+        ),
         owner: wallet.publicKey,
         userCollateral: userCollateralPda,
         position: positionPda,
@@ -932,6 +961,9 @@ describe("solperp-lab", () => {
         position: positionPda,
         priceUpdate: new anchor.web3.PublicKey(
           "C11dmJTHfjc3AizfTBpnU3DaPvFfywbEZpnN2dKPbU6r"
+        ),
+        quotePriceUpdate: new anchor.web3.PublicKey(
+          "44uBBYZwcKenxnRcn9tcH1hLWNsTfLJTJFvMJUvKqehY"
         ),
         user: wallet.publicKey,
       })
@@ -958,6 +990,9 @@ describe("solperp-lab", () => {
         market: marketPda,
         priceUpdate: new anchor.web3.PublicKey(
           "BGFoj6U2hdVMms3sggreHtQfW7GCF5TeqxNLiKT6iBxc"
+        ),
+        quotePriceUpdate: new anchor.web3.PublicKey(
+          "33uBBYZwcKenxnRcn9tcH1hLWNsTfLJTJFvMJUvKqehY"
         ),
         userCollateral: userCollateralPda,
         position: positionPda,
@@ -990,6 +1025,9 @@ describe("solperp-lab", () => {
         market: marketPda,
         priceUpdate: new anchor.web3.PublicKey(
           "C11dmJTHfjc3AizfTBpnU3DaPvFfywbEZpnN2dKPbU6r"
+        ),
+        quotePriceUpdate: new anchor.web3.PublicKey(
+          "44uBBYZwcKenxnRcn9tcH1hLWNsTfLJTJFvMJUvKqehY"
         ),
         owner: wallet.publicKey,
         userCollateral: userCollateralPda,
@@ -1033,6 +1071,9 @@ describe("solperp-lab", () => {
         priceUpdate: new anchor.web3.PublicKey(
           "BGFoj6U2hdVMms3sggreHtQfW7GCF5TeqxNLiKT6iBxc"
         ),
+        quotePriceUpdate: new anchor.web3.PublicKey(
+          "33uBBYZwcKenxnRcn9tcH1hLWNsTfLJTJFvMJUvKqehY"
+        ),
         userCollateral: userCollateralPda,
         position: positionPda,
         user: wallet.publicKey,
@@ -1059,6 +1100,9 @@ describe("solperp-lab", () => {
         position: positionPda,
         priceUpdate: new anchor.web3.PublicKey(
           "C11dmJTHfjc3AizfTBpnU3DaPvFfywbEZpnN2dKPbU6r"
+        ),
+        quotePriceUpdate: new anchor.web3.PublicKey(
+          "44uBBYZwcKenxnRcn9tcH1hLWNsTfLJTJFvMJUvKqehY"
         ),
         user: wallet.publicKey,
       })

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useConnection } from "@solana/wallet-adapter-react";
 import { Program, AnchorProvider, BN, type Idl } from "@coral-xyz/anchor";
 import { getMarketPda } from "@/lib/pda";
-import { PROGRAM_ID } from "@/lib/constants";
+import { DEFAULT_MARKET, PROGRAM_ID } from "@/lib/constants";
 import type { MarketSymbol } from "@/lib/constants";
 import idl from "@/lib/idl/solperp_anchor.json";
 import { PublicKey, type Transaction, type VersionedTransaction } from "@solana/web3.js";
@@ -32,8 +32,8 @@ type MarketAccountClient = {
   };
 };
 
-// why do we create a cutom hooks ??
-export function useMarket(marketSymbol: MarketSymbol = "SOLHYPE") {
+// Custom React hook to fetch and subscribe to on-chain Market PDA data for the selected symbol.
+export function useMarket(marketSymbol: MarketSymbol = DEFAULT_MARKET) {
   
   const { connection } = useConnection();
   const [market, setMarket] = useState<MarketData | null>(null);

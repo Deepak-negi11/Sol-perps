@@ -1,6 +1,7 @@
 import { PublicKey } from "@solana/web3.js";
 import {
   MARKET_SEED,
+  DEFAULT_MARKET,
   MARKET_BASE_FEED_IDS,
   MARKET_QUOTE_FEED_IDS,
   type MarketSymbol,
@@ -24,7 +25,7 @@ function u64ToLittleEndianBytes(value: number): Buffer {
 
 
 
-export function getMarketPda(marketSymbol: MarketSymbol = "SOLHYPE"): PublicKey {
+export function getMarketPda(marketSymbol: MarketSymbol = DEFAULT_MARKET): PublicKey {
   const baseFeedBytes = Buffer.from(MARKET_BASE_FEED_IDS[marketSymbol], "hex");
   const quoteFeedBytes = Buffer.from(MARKET_QUOTE_FEED_IDS[marketSymbol], "hex");
   return PublicKey.findProgramAddressSync(
@@ -57,7 +58,7 @@ export function getLegacyUserCollateralPda(
 export function getPositionPda(
   user: PublicKey,
   positionId?: number,
-  marketSymbol: MarketSymbol = "SOLHYPE",
+  marketSymbol: MarketSymbol = DEFAULT_MARKET,
 ): PublicKey {
   const market = getMarketPda(marketSymbol);
   const seeds = [Buffer.from(POSITION_SEED), market.toBuffer(), user.toBuffer()];
@@ -70,7 +71,7 @@ export function getPositionPda(
 export function getOrderPda(
   user: PublicKey,
   orderId: number,
-  marketSymbol: MarketSymbol = "SOLHYPE",
+  marketSymbol: MarketSymbol = DEFAULT_MARKET,
 ): PublicKey {
   const market = getMarketPda(marketSymbol);
   return PublicKey.findProgramAddressSync(

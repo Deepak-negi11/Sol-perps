@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
+import Image from "next/image";
 import {
   ArrowRight,
   Database,
@@ -10,6 +11,7 @@ import {
   Shield,
   TrendingUp,
   WalletCards,
+  Zap,
 } from "lucide-react";
 import type { PublicKey } from "@solana/web3.js";
 import type { MarketData } from "@/hooks/useMarket";
@@ -429,6 +431,7 @@ export function PoolPage(props: SharedPageProps) {
 
 export function ProfilePage(props: SharedPageProps) {
   const address = props.publicKey?.toBase58();
+  const marketPair = MARKET_LABELS[props.marketSymbol];
   const rows = useMemo(
     () => computePositionRows(props.positions, props.price, props.market),
     [props.market, props.positions, props.price],
@@ -446,15 +449,27 @@ export function ProfilePage(props: SharedPageProps) {
     <div className="nyx-page-shell">
       <section className="nyx-page">
         <div className="nyx-profile-hero">
-          <div className="nyx-avatar">N</div>
-          <div>
+          <div className="nyx-avatar" aria-hidden="true">
+            <Image
+              src="/nyxora-star-logo.jpg"
+              alt=""
+              width={112}
+              height={112}
+              priority
+            />
+          </div>
+          <div className="nyx-profile-identity">
+            <span className="nyx-profile-eyebrow">Trading profile</span>
             <strong>{address ? shortenAddress(address, 6) : "Wallet not connected"}</strong>
-            <span>Solana devnet</span>
-            <span>trading live</span>
+            <div className="nyx-profile-badges">
+              <span><span className="nyx-live-dot" /> Solana devnet</span>
+              <span><Zap size={11} /> {marketPair} active</span>
+            </div>
           </div>
           <aside>
             <span>Account value</span>
             <strong>{formatUsd(props.availableBalance + liveEquity)}</strong>
+            <em>{rows.length} open · {props.history.length} trades</em>
           </aside>
         </div>
 
@@ -499,7 +514,7 @@ export function ProfilePage(props: SharedPageProps) {
         <div className="nyx-activity-list">
           {props.history.slice(0, 4).map((item) => (
             <a href={explorerTx(item.signature)} key={item.id} target="_blank" rel="noreferrer">
-              <span>{item.action.toLowerCase()} {item.isLong ? "long" : "short"} {item.marketSymbol}</span>
+              <span>{item.action.toLowerCase()} {item.isLong ? "long" : "short"} {MARKET_LABELS[item.marketSymbol]}</span>
               <strong>{item.size ? formatUsd(item.size) : "-"}</strong>
               <em>{item.signature.slice(0, 5)}...{item.signature.slice(-4)}</em>
             </a>

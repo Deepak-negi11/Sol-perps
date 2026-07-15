@@ -34,3 +34,15 @@ filename = "programs/solperp-anchor/tests/fixtures/price_update_close.json"
 [[test.validator.account]]
 address = "22uBBYZwcKenxnRcn9tcH1hLWNsTfLJTJFvMJUvKqehY"
 filename = "programs/solperp-anchor/tests/fixtures/price_update_liq.json"
+
+[[test.validator.account]]
+address = "33uBBYZwcKenxnRcn9tcH1hLWNsTfLJTJFvMJUvKqehY"
+filename = "programs/solperp-anchor/tests/fixtures/quote_price_update_open.json"
+
+[[test.validator.account]]
+address = "44uBBYZwcKenxnRcn9tcH1hLWNsTfLJTJFvMJUvKqehY"
+filename = "programs/solperp-anchor/tests/fixtures/quote_price_update_close.json"
+
+[[test.validator.account]]
+address = "55uBBYZwcKenxnRcn9tcH1hLWNsTfLJTJFvMJUvKqehY"
+filename = "programs/solperp-anchor/tests/fixtures/quote_price_update_liq.json"

@@ -7,6 +7,7 @@ import { PublicKey } from "@solana/web3.js";
 import idl from "@/lib/idl/solperp_anchor.json";
 import {
   LEGACY_MARKET_PDA,
+  MARKET_SYMBOLS,
   PROGRAM_ID,
   type MarketSymbol,
 } from "@/lib/constants";
@@ -130,7 +131,7 @@ export function useTradeHistory() {
       }
 
       const eventParser = new EventParser(PROGRAM_ID, new BorshCoder(idl as Idl));
-      const marketSymbols: MarketSymbol[] = ["SOLHYPE"];
+      const marketSymbols: MarketSymbol[] = [...MARKET_SYMBOLS];
       const symbolByMarketAddress = new Map(
         marketSymbols.map((symbol) => [getMarketPda(symbol).toString(), symbol]),
       );

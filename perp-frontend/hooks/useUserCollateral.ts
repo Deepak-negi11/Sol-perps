@@ -23,8 +23,10 @@ type UserCollateralAccountClient = {
   };
 };
 
-export function useUserCollateral(_marketSymbol: MarketSymbol = "SOLHYPE") {
+export function useUserCollateral(_marketSymbol: MarketSymbol = "SOLUSD") {
   void _marketSymbol;
+  // User collateral is the wallet's deposit ledger inside the protocol. It is
+  // different from the SPL token account that actually holds wallet USDC.
   const { connection } = useConnection();
   const { publicKey } = useWallet();
   const [data, setData] = useState<UserCollateralData | null>(null);
@@ -37,8 +39,9 @@ export function useUserCollateral(_marketSymbol: MarketSymbol = "SOLHYPE") {
       return;
     }
     try {
-      const collateralAddress = getUserCollateralPda(publicKey);
-      const readonlyWallet = {
+      // One shared USDC margin PDA backs positions across every market.
+      const pda = getUserCollateralPda(publicKey);
+      const dummyWallet = {
         publicKey: PublicKey.default,
         signTransaction: async <T extends Transaction | VersionedTransaction>(
           tx: T,
@@ -49,13 +52,11 @@ export function useUserCollateral(_marketSymbol: MarketSymbol = "SOLHYPE") {
           txs: T[],
         ) => txs,
       };
-      const provider = new AnchorProvider(connection, readonlyWallet, { commitment: "confirmed" });
-      
+      const provider = new AnchorProvider(connection, dummyWallet, { commitment: "confirmed" });
       const program = new Program(idl as Idl, provider);
-      const userCollateralAccount = program.account as unknown as UserCollateralAccountClient;
-      
-      const collateralAccount = await userCollateralAccount.userCollateral.fetch(collateralAddress);
-      setData(collateralAccount);
+      const collateralAccount = program.account as unknown as UserCollateralAccountClient;
+      const account = await collateralAccount.userCollateral.fetch(pda);
+      setData(account);
     } catch {
       setData(null);
     } finally {
@@ -64,18 +65,22 @@ export function useUserCollateral(_marketSymbol: MarketSymbol = "SOLHYPE") {
   }, [connection, publicKey]);
 
   useEffect(() => {
-    void Promise.resolve().then(fetchData);
+    const initialFetch = window.setTimeout(() => void fetchData(), 0);
+    if (!publicKey) {
+      return () => window.clearTimeout(initialFetch);
+    }
 
-    if (!publicKey) return;
-    const collateralAddress = getUserCollateralPda(publicKey);
-    const subscriptionId = connection.onAccountChange(collateralAddress, () => fetchData(), "confirmed");
-    const safetyTimer = setInterval(fetchData, 30_000);
+    const pda = getUserCollateralPda(publicKey);
+    const subId = connection.onAccountChange(pda, () => fetchData(),
+  "confirmed");
+    const interval = setInterval(fetchData, 10_000)
 
-    return () => {
-      connection.removeAccountChangeListener(subscriptionId);
-      clearInterval(safetyTimer);
-    };
-  }, [connection, publicKey, fetchData]);
+   return () => {
+        window.clearTimeout(initialFetch);
+        connection.removeAccountChangeListener(subId);
+        clearInterval(interval);
+      };
+    }, [connection, publicKey, fetchData]);
 
   const refetch = useCallback(() => {
     fetchData();
@@ -84,6 +89,8 @@ export function useUserCollateral(_marketSymbol: MarketSymbol = "SOLHYPE") {
     setTimeout(fetchData, 5000);
   }, [fetchData]);
 
+  // Available collateral is the free balance the user can withdraw or use for a
+  // new order. Locked collateral backs open positions or pending trigger orders.
   const availableAmount = data
     ? data.depositedAmount.sub(data.lockedAmount)
     : new BN(0);

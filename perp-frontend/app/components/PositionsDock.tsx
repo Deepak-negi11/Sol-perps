@@ -17,7 +17,7 @@ import { BN } from "@coral-xyz/anchor";
 import { sendWithFreshPythPrice } from "@/lib/pyth";
 import type { PublicKey } from "@solana/web3.js";
 import { useUserCollateral } from "@/hooks/useUserCollateral";
-import type { MarketSymbol } from "@/lib/constants";
+import { MARKET_LABELS, type MarketSymbol } from "@/lib/constants";
 import { useTradeHistory } from "@/hooks/useTradeHistory";
 import LiveTrades from "./LiveTrades";
 
@@ -226,7 +226,7 @@ export default function PositionsDock({
                         <tr key={computedPosition.publicKey.toString()}>
                           <td>
                             <div className="pos-market-cell">
-                              <span className="pos-market-pair">{marketSymbol}-PERP</span>
+                              <span className="pos-market-pair">{MARKET_LABELS[marketSymbol].replace("/", "-")}-PERP</span>
                               <div className="pos-market-sub">
                                 <span className={`side-badge mini ${computedPosition.isLong ? "long" : "short"}`}>
                                   {computedPosition.isLong ? "LONG" : "SHORT"}

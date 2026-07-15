@@ -38,11 +38,11 @@ type PositionAccountClient = {
   };
 };
 
-export function usePosition(marketSymbol: MarketSymbol = "SOLHYPE") {
+export function usePosition(marketSymbol: MarketSymbol = "SOLUSD") {
   const { connection } = useConnection();
   const { publicKey } = useWallet();
-  const [position, setPosition] = useState<PositionData | null>(null);
-  const [positions, setPositions] = useState<PositionData[]>([]);
+  const [position, setPosition] = useState<PositionData | null>(null); 
+  const [positions, setPositions] = useState<PositionData[]>([]); 
   const [loading, setLoading] = useState(true);
 
   const fetchPosition = useCallback(async () => {
@@ -67,12 +67,10 @@ export function usePosition(marketSymbol: MarketSymbol = "SOLHYPE") {
       const provider = new AnchorProvider(connection, readonlyWallet, {
         commitment: "confirmed",
       });
-      
       const program = new Program(idl as Idl, provider);
       const positionAccount = program.account as unknown as PositionAccountClient;
       const marketAddress = getMarketPda(marketSymbol);
 
-      
       const positionAccounts = await positionAccount.position.all([
         {
           memcmp: {
@@ -102,7 +100,7 @@ export function usePosition(marketSymbol: MarketSymbol = "SOLHYPE") {
         );
 
       setPositions(openPositions);
-      setPosition(openPositions[0] ?? null);
+      setPosition(openPositions[0] ?? null); // newest one, for older callers
     } catch {
       setPosition(null);
       setPositions([]);
@@ -112,10 +110,13 @@ export function usePosition(marketSymbol: MarketSymbol = "SOLHYPE") {
   }, [connection, marketSymbol, publicKey]);
 
   useEffect(() => {
-    void Promise.resolve().then(fetchPosition);
+    const initialFetch = window.setTimeout(() => void fetchPosition(), 0);
 
-    if (!publicKey) return;
+    if (!publicKey) {
+      return () => window.clearTimeout(initialFetch);
+    }
     const marketAddress = getMarketPda(marketSymbol);
+   
     const ownerAndMarketFilters = [
       { memcmp: { offset: 8, bytes: publicKey.toBase58() } },
       { memcmp: { offset: 40, bytes: marketAddress.toBase58() } },
@@ -126,9 +127,11 @@ export function usePosition(marketSymbol: MarketSymbol = "SOLHYPE") {
       "confirmed",
       ownerAndMarketFilters,
     );
+    // 3) Safety net every 30s.
     const safetyTimer = setInterval(fetchPosition, 30_000);
 
     return () => {
+      window.clearTimeout(initialFetch);
       connection.removeProgramAccountChangeListener(subscriptionId);
       clearInterval(safetyTimer);
     };

@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
-import { ChevronDown, Copy, LogOut } from "lucide-react";
+import { Check, ChevronDown, Copy, LogOut } from "lucide-react";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useMarket } from "@/hooks/useMarket";
@@ -16,7 +16,12 @@ import {
   lamportsToToken,
   shortenAddress,
 } from "@/lib/format";
-import { MARKET_LABELS, MARKET_SYMBOLS, type MarketSymbol } from "@/lib/constants";
+import {
+  DEFAULT_MARKET,
+  MARKET_LABELS,
+  MARKET_SYMBOLS,
+  type MarketSymbol,
+} from "@/lib/constants";
 import AdminPanel from "./components/AdminPanel";
 import PerpChart, { type ChartTimeframe } from "./components/PerpChart";
 import PositionsDock from "./components/PositionsDock";
@@ -73,7 +78,10 @@ function beginPointerResize(
 
 export default function Home() {
   const [timeframe, setTimeframe] = useState<ChartTimeframe>("15m");
-  const [selectedMarket, setSelectedMarket] = useState<MarketSymbol>("SOLHYPE");
+  const [selectedMarket, setSelectedMarket] = useState<MarketSymbol>(DEFAULT_MARKET);
+  const [isMarketMenuOpen, setIsMarketMenuOpen] = useState(false);
+  const [marketMenuDirection, setMarketMenuDirection] = useState<"up" | "down">("down");
+  const marketMenuRef = useRef<HTMLDivElement>(null);
   const [activeView, setActiveView] = useState<AppView>("trade");
   const [ticketWidth, setTicketWidth] = useState(360);
   const [dockHeight, setDockHeight] = useState(240);
@@ -83,7 +91,13 @@ export default function Home() {
 
   const { connection } = useConnection();
   const { publicKey, disconnect } = useWallet();
-  const { priceData } = usePythPrice(selectedMarket);
+  const { priceData: solUsdPriceData } = usePythPrice("SOLUSD");
+  const { priceData: solHypePriceData } = usePythPrice("SOLHYPE");
+  const marketPrices = {
+    SOLUSD: solUsdPriceData,
+    SOLHYPE: solHypePriceData,
+  };
+  const priceData = marketPrices[selectedMarket];
   const {
     market,
     loading: marketLoading,
@@ -173,6 +187,36 @@ export default function Home() {
       clearInterval(interval);
     };
   }, [baseAsset, quoteAsset]);
+
+  useEffect(() => {
+    if (!isMarketMenuOpen) return;
+
+    const closeMenu = (event: MouseEvent) => {
+      if (!marketMenuRef.current?.contains(event.target as Node)) {
+        setIsMarketMenuOpen(false);
+      }
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsMarketMenuOpen(false);
+    };
+
+    document.addEventListener("pointerdown", closeMenu);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeMenu);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [isMarketMenuOpen]);
+
+  const toggleMarketMenu = () => {
+    if (!isMarketMenuOpen && marketMenuRef.current) {
+      const rect = marketMenuRef.current.getBoundingClientRect();
+      const menuHeight = 154;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      setMarketMenuDirection(spaceBelow < menuHeight && rect.top > menuHeight ? "up" : "down");
+    }
+    setIsMarketMenuOpen((open) => !open);
+  };
 
   useEffect(() => {
     if (!publicKey) return;
@@ -314,19 +358,61 @@ export default function Home() {
           <>
             <section className="market-strip" aria-label="Selected market">
           <div className="market-title">
-            <select
-              className="market-select"
-              value={selectedMarket}
-              onChange={(event) =>
-                setSelectedMarket(event.target.value as MarketSymbol)
-              }
-            >
-              {MARKET_SYMBOLS.map((symbol) => (
-                <option key={symbol} value={symbol}>
-                  {MARKET_LABELS[symbol].replace("/", "-")}
-                </option>
-              ))}
-            </select>
+            <div className="market-menu-wrap" ref={marketMenuRef}>
+              <button
+                type="button"
+                className="market-select"
+                aria-haspopup="listbox"
+                aria-expanded={isMarketMenuOpen}
+                onClick={toggleMarketMenu}
+              >
+                <span>{marketDash}</span>
+                <ChevronDown
+                  size={15}
+                  className={isMarketMenuOpen ? "market-chevron open" : "market-chevron"}
+                />
+              </button>
+              {isMarketMenuOpen ? (
+                <div
+                  className={`market-menu ${marketMenuDirection}`}
+                  role="listbox"
+                  aria-label="Select market"
+                >
+                  <div className="market-menu-label">Markets</div>
+                  {MARKET_SYMBOLS.map((symbol) => {
+                    const selected = symbol === selectedMarket;
+                    return (
+                      <button
+                        type="button"
+                        role="option"
+                        aria-selected={selected}
+                        className={selected ? "market-option selected" : "market-option"}
+                        key={symbol}
+                        onClick={() => {
+                          setSelectedMarket(symbol);
+                          setIsMarketMenuOpen(false);
+                        }}
+                      >
+                        <span className="market-option-check">
+                          {selected ? <Check size={19} /> : null}
+                        </span>
+                        <span className="market-option-copy">
+                          <strong>{MARKET_LABELS[symbol].replace("/", "-")}</strong>
+                        </span>
+                        <span className="market-option-price">
+                          {marketPrices[symbol]?.price.toFixed(symbol === "SOLUSD" ? 2 : 6) ?? "—"}
+                        </span>
+                        <span className="market-option-change">
+                          {symbol === selectedMarket && change24h !== null
+                            ? `${change24h >= 0 ? "+" : ""}${change24h.toFixed(2)}%`
+                            : ""}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </div>
             <div className="market-pair">
               <span>Ratio perpetual</span>
               <strong>{baseAsset}/USD ÷ {quoteAsset}/USD</strong>
@@ -371,6 +457,7 @@ export default function Home() {
         {!market && !isProgramMissing && isConfiguredAdmin ? (
           <div className="setup-inline-panel">
             <AdminPanel
+              key={selectedMarket}
               market={market}
               marketSymbol={selectedMarket}
               loading={marketLoading}

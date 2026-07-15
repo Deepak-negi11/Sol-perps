@@ -19,6 +19,7 @@ import {
 } from "klinecharts";
 import {
   MARKET_BASE_FEED_IDS,
+  MARKET_LABELS,
   MARKET_QUOTE_FEED_IDS,
   type MarketSymbol,
 } from "@/lib/constants";
@@ -51,6 +52,7 @@ const PYTH_BENCH =
 const FEED_ID_TO_SYMBOL: Record<string, string> = {
   [MARKET_BASE_FEED_IDS.SOLHYPE]: "Crypto.SOL/USD",
   [MARKET_QUOTE_FEED_IDS.SOLHYPE]: "Crypto.HYPE/USD",
+  [MARKET_QUOTE_FEED_IDS.SOLUSD]: "Crypto.USDC/USD",
 };
 
 const INDICATORS = ["MA", "EMA", "BOLL", "VOL", "MACD"] as const;
@@ -437,7 +439,7 @@ export default function PerpChart({ price, timeframe, market }: PerpChartProps) 
     const quoteSymbol = FEED_ID_TO_SYMBOL[MARKET_QUOTE_FEED_IDS[market]];
 
     async function load() {
-      setStatus("Loading ratio candles…");
+      setStatus(`Loading ${MARKET_LABELS[market]} candles…`);
       try {
         const [base, quote] = await Promise.all([
           fetchFeedHistory(baseSymbol, resolution, from, nowSec, abort.signal),
@@ -458,7 +460,7 @@ export default function PerpChart({ price, timeframe, market }: PerpChartProps) 
         candlesRef.current = candles;
         loadedKeyRef.current = marketKey;
         applyCandles(chartRef.current, candles);
-        setStatus(`${candles.length} real SOL/HYPE candles`);
+        setStatus(`${candles.length} real ${MARKET_LABELS[market]} candles`);
       } catch {
         if (!abort.signal.aborted) {
           const fallbackCandles = buildFallbackCandles(timeframe, priceRef.current);

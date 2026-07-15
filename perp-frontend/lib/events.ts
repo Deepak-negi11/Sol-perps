@@ -1,6 +1,6 @@
 import { BN, BorshCoder, EventParser, type Idl } from "@coral-xyz/anchor";
 import idl from "@/lib/idl/solperp_anchor.json";
-import { PROGRAM_ID, type MarketSymbol } from "@/lib/constants";
+import { MARKET_SYMBOLS, PROGRAM_ID, type MarketSymbol } from "@/lib/constants";
 import { getMarketPda } from "@/lib/pda";
 
 export interface LiveTrade {
@@ -15,9 +15,8 @@ export interface LiveTrade {
 
 const eventParser = new EventParser(PROGRAM_ID, new BorshCoder(idl as Idl));
 
-const marketSymbols: MarketSymbol[] = ["SOLHYPE"];
 const symbolByMarketAddress = new Map(
-  marketSymbols.map((symbol) => [getMarketPda(symbol).toString(), symbol]),
+  MARKET_SYMBOLS.map((symbol) => [getMarketPda(symbol).toString(), symbol]),
 );
 
 function toPlainNumber(value: unknown): number {

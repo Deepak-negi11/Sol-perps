@@ -60,23 +60,45 @@ function serializePriceUpdate(feedIdHex, price, exponent, publishTime) {
 }
 
 const feedIdHex = 'ef0d8b6fda2ceba41da15d4095d1da392a0d2f8ed0c6c7bc0f4cfac8c280b50d';
+const quoteFeedIdHex = 'eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a';
 const publishTime = Math.floor(Date.now() / 1000) - 2;
 
 const fixtures = [
     {
         pubkey: 'BGFoj6U2hdVMms3sggreHtQfW7GCF5TeqxNLiKT6iBxc',
+        feedId: feedIdHex,
         price: 1000,
         name: 'price_update_open.json'
     },
     {
         pubkey: 'C11dmJTHfjc3AizfTBpnU3DaPvFfywbEZpnN2dKPbU6r',
+        feedId: feedIdHex,
         price: 900,
         name: 'price_update_close.json'
     },
     {
         pubkey: '22uBBYZwcKenxnRcn9tcH1hLWNsTfLJTJFvMJUvKqehY',
+        feedId: feedIdHex,
         price: 940,
         name: 'price_update_liq.json'
+    },
+    {
+        pubkey: '33uBBYZwcKenxnRcn9tcH1hLWNsTfLJTJFvMJUvKqehY',
+        feedId: quoteFeedIdHex,
+        price: 1000000,
+        name: 'quote_price_update_open.json'
+    },
+    {
+        pubkey: '44uBBYZwcKenxnRcn9tcH1hLWNsTfLJTJFvMJUvKqehY',
+        feedId: quoteFeedIdHex,
+        price: 1000000,
+        name: 'quote_price_update_close.json'
+    },
+    {
+        pubkey: '55uBBYZwcKenxnRcn9tcH1hLWNsTfLJTJFvMJUvKqehY',
+        feedId: quoteFeedIdHex,
+        price: 1000000,
+        name: 'quote_price_update_liq.json'
     }
 ];
 
@@ -86,7 +108,7 @@ if (!fs.existsSync(fixturesDir)) {
 }
 
 fixtures.forEach(f => {
-    const dataBuffer = serializePriceUpdate(feedIdHex, f.price, -6, publishTime);
+    const dataBuffer = serializePriceUpdate(f.feedId, f.price, -6, publishTime);
     const fixture = {
         pubkey: f.pubkey,
         account: {
